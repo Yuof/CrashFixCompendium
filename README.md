@@ -17,7 +17,8 @@ DLL, each with its own on/off switch. VR is not supported.
 | `DecalVertexTable` | A footprint, blood or hit mark lands on a mesh with unused vertices, and the game makes its table for the mesh's vertices too small |
 | `FootIkRaycast` | More than 50 characters are loaded nearby, and the game moves its foot-IK table to a bigger block while other characters' animation still uses the old one |
 
-Each fix's own comment in `src/fixes/<Key>.cpp` explains the bug and the patch.
+Each fix's own comment in `src/fixes/<Key>.cpp` explains the bug and the patch. What changed in each version:
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Switches
 `SKSE/Plugins/CrashFixCompendium.ini` ships with the mod and holds the defaults; an update replaces it.
