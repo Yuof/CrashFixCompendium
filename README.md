@@ -15,6 +15,7 @@ DLL, each with its own on/off switch. VR is not supported.
 | `ShadowMapStackAlign` | Engine Fixes 7.0.15 to the 7.0.21 beta and alandtse's fork 7.13.0: its ShadowMap fix runs with a misaligned stack |
 | `TrespassPursue` | A house or shop owner starts escorting someone out and the escort reads a setting the game never set. The fix makes the owner follow someone he lost sight of until they leave, instead of giving up at random |
 | `DecalVertexTable` | A footprint, blood or hit mark lands on a mesh with unused vertices, and the game makes its table for the mesh's vertices too small |
+| `FootIkRaycast` | More than 50 characters are loaded nearby, and the game moves its foot-IK table to a bigger block while other characters' animation still uses the old one |
 
 Each fix's own comment in `src/fixes/<Key>.cpp` explains the bug and the patch.
 
