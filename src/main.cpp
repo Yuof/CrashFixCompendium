@@ -93,7 +93,7 @@ namespace
 			std::error_code ec;
 			if (!g_switches[i].on) {
 				LogOff(fix.key, g_switches[i].from);
-			} else if (std::filesystem::exists(g_plugins / fix.oldDll, ec)) {
+			} else if (!fix.oldDll.empty() && std::filesystem::exists(g_plugins / fix.oldDll, ec)) {
 				logger::info("[{}] skipped: old {} is installed, remove it"sv, fix.key, fix.oldDll);
 			} else {
 				LogResult(fix.key, fix.install());
