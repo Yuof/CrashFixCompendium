@@ -10,9 +10,7 @@
 
 namespace
 {
-	constexpr wchar_t          kSection[] = L"Fixes";
-	constexpr wchar_t          kAbsent[] = L"\x01";
-	constexpr std::string_view kSectionLine = "[Fixes]";
+	constexpr wchar_t kAbsent[] = L"\x01";
 
 	constexpr std::string_view kHeader =
 		"; Crash Fix Compendium - your settings. Updates never replace this file.\r\n"
@@ -27,11 +25,12 @@ namespace
 	}
 
 	// GetPrivateProfileString, not Int: Int reads "true" as 0, which would silently disable a fix
-	std::optional<std::wstring> Value(const std::filesystem::path& a_file, const std::wstring& a_key)
+	std::optional<std::wstring> Value(const std::filesystem::path& a_file, const std::wstring& a_section,
+		const std::wstring& a_key)
 	{
 		wchar_t buffer[256];
-		GetPrivateProfileStringW(kSection, a_key.c_str(), kAbsent, buffer, static_cast<DWORD>(std::size(buffer)),
-			a_file.c_str());
+		GetPrivateProfileStringW(a_section.c_str(), a_key.c_str(), kAbsent, buffer,
+			static_cast<DWORD>(std::size(buffer)), a_file.c_str());
 		if (std::wstring_view{ buffer } == kAbsent) {
 			return std::nullopt;
 		}
@@ -64,10 +63,12 @@ namespace
 	}
 
 	// Windows accepts anything after the closing bracket
-	bool IsFixesHeader(std::string_view a_line)
+	bool IsHeaderOf(std::string_view a_line, std::string_view a_header)
 	{
-		return SameText(Trim(a_line).substr(0, kSectionLine.size()), kSectionLine);
+		return SameText(Trim(a_line).substr(0, a_header.size()), a_header);
 	}
+
+	bool IsAnyHeader(std::string_view a_line) { return Trim(a_line).starts_with('['); }
 
 	std::vector<std::string_view> Lines(std::string_view a_text)
 	{
@@ -85,6 +86,26 @@ namespace
 		std::ofstream out(a_file, std::ios::binary | std::ios::app);
 		return out.write(a_bytes.data(), static_cast<std::streamsize>(a_bytes.size())).flush().good();
 	}
+
+	// Through a temporary file, so a failed write leaves the old file as it was
+	bool Replace(const std::filesystem::path& a_file, std::string_view a_bytes)
+	{
+		auto temp = a_file;
+		temp += L".tmp";
+		{
+			std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+			if (!out.write(a_bytes.data(), static_cast<std::streamsize>(a_bytes.size())).flush()) {
+				return false;
+			}
+		}
+		std::error_code ec;
+		std::filesystem::rename(temp, a_file, ec);
+		if (ec) {
+			std::filesystem::remove(temp, ec);
+			return false;
+		}
+		return true;
+	}
 }
 
 namespace Settings
@@ -97,25 +118,29 @@ namespace Settings
 		return std::filesystem::path(a_exe).parent_path() / L"Data" / L"SKSE" / L"Plugins";
 	}
 
-	Switch Read(const std::filesystem::path& a_shipped, const std::filesystem::path& a_custom, std::string_view a_key)
+	Switch Read(const std::filesystem::path& a_shipped, const std::filesystem::path& a_custom, std::string_view a_key,
+		std::string_view a_section)
 	{
 		const auto key = Widen(a_key);
+		const auto section = Widen(a_section);
 		Switch     result{ false, From::kMissing, false };
-		if (const auto custom = Value(a_custom, key)) {
+		if (const auto custom = Value(a_custom, section, key)) {
 			if (IsSwitch(*custom)) {
 				return { *custom == L"1", From::kCustom, false };
 			}
 			result.badOverride = true;
 		}
-		if (const auto shipped = Value(a_shipped, key); shipped && IsSwitch(*shipped)) {
+		if (const auto shipped = Value(a_shipped, section, key); shipped && IsSwitch(*shipped)) {
 			result.on = *shipped == L"1";
 			result.from = From::kShipped;
 		}
 		return result;
 	}
 
-	Sync SyncCustom(const std::filesystem::path& a_custom, std::span<const std::string_view> a_keys)
+	Sync SyncCustom(const std::filesystem::path& a_custom, std::span<const std::string_view> a_keys,
+		std::string_view a_section)
 	{
+		const auto header = "[" + std::string(a_section) + "]";
 		std::error_code ec;
 		const bool      exists = std::filesystem::exists(a_custom, ec);
 		if (ec) {
@@ -138,8 +163,8 @@ namespace Settings
 		std::string_view body = text;
 		if (body.starts_with("\xEF\xBB\xBF")) {
 			body.remove_prefix(3);
-			// Windows reads a BOM glued to the section header as no section: the player's lines would be ignored
-			if (IsFixesHeader(body.substr(0, body.find('\n')))) {
+			// Windows reads a BOM glued to a section header as no section: the player's lines would be ignored
+			if (IsAnyHeader(body.substr(0, body.find('\n')))) {
 				return { .error = "saved as UTF-8 with BOM, so Windows ignores its settings and the shipped ones "
 					              "apply: save it as ANSI or UTF-8" };
 			}
@@ -156,21 +181,39 @@ namespace Settings
 			return {};
 		}
 
+		std::string newLines;
+		for (const auto key : missing) {
+			newLines += ';';
+			newLines += key;
+			newLines += "=1\r\n";
+		}
+
+		// Windows reads only the first header of a section, so a line goes into the section that is there. Before the
+		// next section when there is one, after its last line that isn't blank.
+		const auto own = std::ranges::find_if(lines, [&](std::string_view line) { return IsHeaderOf(line, header); });
+		const auto next = own == lines.end() ? lines.end() : std::find_if(own + 1, lines.end(), IsAnyHeader);
+		if (next != lines.end()) {
+			auto last = next - 1;
+			while (last != own && Trim(*last).empty()) {
+				--last;
+			}
+			const auto at = static_cast<std::size_t>(last->data() - text.data()) + last->size() + 1;
+			if (!Replace(a_custom, text.substr(0, at) + newLines + text.substr(at))) {
+				return { .error = "the file is read-only or locked" };
+			}
+			return { .added = std::vector<std::string>(missing.begin(), missing.end()) };
+		}
+
 		std::string addition;
 		if (!exists) {
 			addition = kHeader;
 		} else if (!text.empty() && text.back() != '\n') {
 			addition = "\r\n";
 		}
-		if (std::ranges::none_of(lines, IsFixesHeader)) {
-			addition += kSectionLine;
-			addition += "\r\n";
+		if (own == lines.end()) {
+			addition += header + "\r\n";
 		}
-		for (const auto key : missing) {
-			addition += ';';
-			addition += key;
-			addition += "=1\r\n";
-		}
+		addition += newLines;
 
 		if (!Append(a_custom, addition)) {
 			return { .error = exists ? "the file is read-only or locked" : "could not create the file" };

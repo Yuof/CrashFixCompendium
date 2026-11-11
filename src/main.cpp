@@ -58,25 +58,36 @@ namespace
 
 	void ReadSwitches()
 	{
-		std::vector<std::string_view> keys;
+		// Fixes first: a new custom file then starts with them
+		std::vector<std::string_view> sections{ "Fixes" };
 		for (const auto& fix : AllFixes()) {
-			keys.push_back(fix.key);
+			if (std::ranges::find(sections, fix.section) == sections.end()) {
+				sections.push_back(fix.section);
+			}
 		}
 
 		const auto custom = g_plugins / kCustomFile;
-		const auto sync = Settings::SyncCustom(custom, keys);
-		if (sync.generated) {
-			logger::info("generated {}"sv, kCustomFile);
-		}
-		for (const auto& key : sync.added) {
-			logger::info("added to {}: {}"sv, kCustomFile, key);
-		}
-		if (!sync.error.empty()) {
-			logger::error("failed: could not update {} ({})"sv, kCustomFile, sync.error);
+		for (const auto section : sections) {
+			std::vector<std::string_view> keys;
+			for (const auto& fix : AllFixes()) {
+				if (fix.section == section) {
+					keys.push_back(fix.key);
+				}
+			}
+			const auto sync = Settings::SyncCustom(custom, keys, section);
+			if (sync.generated) {
+				logger::info("generated {}"sv, kCustomFile);
+			}
+			for (const auto& key : sync.added) {
+				logger::info("added to {}: {}"sv, kCustomFile, key);
+			}
+			if (!sync.error.empty()) {
+				logger::error("failed: could not update {} ({})"sv, kCustomFile, sync.error);
+			}
 		}
 
 		for (const auto& fix : AllFixes()) {
-			g_switches.push_back(Settings::Read(g_plugins / kShippedFile, custom, fix.key));
+			g_switches.push_back(Settings::Read(g_plugins / kShippedFile, custom, fix.key, fix.section));
 			if (g_switches.back().badOverride) {
 				logger::info("[{}] value in {} is not 0 or 1: using the shipped setting"sv, fix.key, kCustomFile);
 			}

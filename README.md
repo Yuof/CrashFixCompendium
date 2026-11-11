@@ -18,6 +18,10 @@ DLL, each with its own on/off switch. VR is not supported.
 | `FootIkRaycast` | More than 50 characters are loaded nearby, and the game moves its foot-IK table to a bigger block while other characters' animation still uses the old one |
 | `ShoutEmptyWord` | The unlock key in the Magic menu on a shout with fewer than three words: the game steps into an empty word slot |
 | `NifStringIndex` | A mesh in which a block names a string past the end of the file's string list: the game reads whatever follows the list as the string |
+| `AudioFormat` | A sound file the game can't read (32-bit float, ADPCM, an .mp3 renamed) or whose header says 0 channels: XAudio2 gets a voice with 0 channels (`XAudio2_7.dll+25181`) |
+
+`AudioFormatScan` (off by default, in the INIs' `[Reports]` section) is not a fix: it lists every sound file in Data,
+loose and in .bsa archives, that the game won't play, so the file behind an `AudioFormat` line can be found.
 
 Each fix's own comment in `src/fixes/<Key>.cpp` explains the bug and the patch. What changed in each version:
 [CHANGELOG.md](CHANGELOG.md).

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(
 	CrashFixCompendium
-	VERSION 1.3.0
+	VERSION 1.4.0
 	LANGUAGES CXX
 )
 
@@ -49,6 +49,12 @@ target_include_directories(settings_test PRIVATE src)
 target_compile_definitions(settings_test PRIVATE NOMINMAX)
 target_compile_options(settings_test PRIVATE /utf-8)
 add_test(NAME settings COMMAND settings_test)
+
+add_executable(audio_header_test tests/audio_header_test.cpp)
+target_compile_features(audio_header_test PRIVATE cxx_std_20)
+target_include_directories(audio_header_test PRIVATE src)
+target_compile_options(audio_header_test PRIVATE /utf-8)
+add_test(NAME audio_header COMMAND audio_header_test)
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)

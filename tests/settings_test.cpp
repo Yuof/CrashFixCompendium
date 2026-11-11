@@ -351,6 +351,64 @@ namespace
 		CHECK(!Settings::Read(kShipped, kCustom, "PathIdle").on);
 	}
 
+	void read_by_section()
+	{
+		Reset();
+		Put(kShipped, "[Fixes]\r\nPathIdle=1\r\n[Reports]\r\nScan=0\r\n");
+		const auto a = Settings::Read(kShipped, kCustom, "Scan", "Reports");
+		CHECK(!a.on);
+		CHECK(a.from == Settings::From::kShipped);
+		CHECK(Settings::Read(kShipped, kCustom, "Scan").from == Settings::From::kMissing);
+		Put(kCustom, "[Fixes]\r\nPathIdle=0\r\n[Reports]\r\nScan=1\r\n");
+		CHECK(Settings::Read(kShipped, kCustom, "Scan", "Reports").on);
+		CHECK(!Settings::Read(kShipped, kCustom, "PathIdle").on);
+	}
+
+	// a file from before the Reports section gets it at the end
+	void sync_adds_a_second_section()
+	{
+		Reset();
+		const std::string old = "[Fixes]\r\nPathIdle=0\r\n";
+		Put(kCustom, old);
+		constexpr std::string_view key[] = { "Scan" };
+		const auto                 s = Settings::SyncCustom(kCustom, key, "Reports");
+		CHECK(s.added == std::vector<std::string>{ "Scan" });
+		CHECK(Get(kCustom) == old + "[Reports]\r\n;Scan=1\r\n");
+	}
+
+	// a later fix goes into Fixes, not into the section that ends the file
+	void sync_inserts_into_its_section()
+	{
+		Reset();
+		const std::string head = "[Fixes]\r\nPathIdle=0\r\n";
+		const std::string tail = "\r\n[Reports]\r\n;Scan=1\r\n";
+		Put(kCustom, head + tail);
+		constexpr std::string_view keys[] = { "PathIdle", "New" };
+		const auto                 s = Settings::SyncCustom(kCustom, keys);
+		CHECK(s.added == std::vector<std::string>{ "New" });
+		CHECK(Get(kCustom) == head + ";New=1\r\n" + tail);
+
+		Put(kCustom, head + "New=0\r\n" + tail);
+		CHECK(Settings::Read(kShipped, kCustom, "New").from == Settings::From::kCustom);
+
+		Put(kCustom, "[Fixes]\r\n[Reports]\r\n");  // an empty section: the line goes right under its header
+		Settings::SyncCustom(kCustom, keys);
+		CHECK(Get(kCustom) == "[Fixes]\r\n;PathIdle=1\r\n;New=1\r\n[Reports]\r\n");
+	}
+
+	void sync_insert_keeps_a_readonly_file()
+	{
+		Reset();
+		const std::string old = "[Fixes]\r\nPathIdle=0\r\n[Reports]\r\n";
+		Put(kCustom, old);
+		SetFileAttributesW(kCustom.c_str(), FILE_ATTRIBUTE_READONLY);
+		constexpr std::string_view keys[] = { "PathIdle", "New" };
+		const auto                 s = Settings::SyncCustom(kCustom, keys);
+		CHECK(!s.error.empty());
+		CHECK(Get(kCustom) == old);
+		CHECK(!fs::exists(fs::path(kCustom) += L".tmp"));
+	}
+
 	// an empty exe path must not become relative INI paths: GetPrivateProfile* would look in the Windows folder
 	void plugins_folder_from_the_exe()
 	{
@@ -393,6 +451,10 @@ int main()
 	readonly_reports_error();
 	utf8_bom_on_section_line_reports_error();
 	section_with_a_trailing_comment_counts();
+	read_by_section();
+	sync_adds_a_second_section();
+	sync_inserts_into_its_section();
+	sync_insert_keeps_a_readonly_file();
 	plugins_folder_from_the_exe();
 	milestone_is_powers_of_ten();
 	find_call_wants_exactly_one();

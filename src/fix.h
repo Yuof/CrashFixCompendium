@@ -112,8 +112,9 @@ struct Fix
 	std::string_view key;
 	std::string_view oldDll;  // the standalone DLL it yields to; empty for a fix that never had one
 	Result (*install)();
-	bool        atLoad = false;  // the others install at kPostLoad, so nothing depends on where this DLL's name sorts
-	std::size_t trampoline = 0;  // bytes it allocates: SKSE::Init reserves the sum, once
+	bool             atLoad = false;       // the others install at kPostLoad, so nothing depends on where this DLL's name sorts
+	std::size_t      trampoline = 0;       // bytes it allocates: SKSE::Init reserves the sum, once
+	std::string_view section = "Fixes";  // its switch's INI section: Reports for a check that fixes nothing
 };
 
 // Local static: other files' globals call Register while the DLL loads

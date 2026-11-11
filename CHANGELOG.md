@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0
+- New fix: Audio Format (switch `AudioFormat`, on by default). A sound file in a format the game can't read (a
+  32-bit float or ADPCM .wav, an .mp3 or .ogg renamed, a cut-off file) or whose header says 0 channels made the game
+  crash in `XAudio2_7.dll+25181` when the sound started. Such a sound now stays silent and the log gives its id.
+- New switch: Audio Format Scan (`AudioFormatScan`, off by default). Lists in the log every sound file in Data, loose
+  and in .bsa archives, that the game won't play, with the id Audio Format logs.
+
 ## 1.3.0
 - New fix: Shout Empty Word (switch `ShoutEmptyWord`, on by default). Pressing the unlock key in the Magic menu on a
   mod's shout that has fewer than three words made the game crash at `SkyrimSE.exe+093BA03` (1.6.1170).

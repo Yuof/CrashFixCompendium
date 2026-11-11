@@ -28,7 +28,8 @@ namespace Settings
 	// Empty for an empty exe path.
 	std::filesystem::path PluginsFolder(std::wstring_view a_exe);
 
-	Switch Read(const std::filesystem::path& a_shipped, const std::filesystem::path& a_custom, std::string_view a_key);
+	Switch Read(const std::filesystem::path& a_shipped, const std::filesystem::path& a_custom, std::string_view a_key,
+		std::string_view a_section = "Fixes");
 
 	struct Sync
 	{
@@ -37,7 +38,8 @@ namespace Settings
 		std::string              error;
 	};
 
-	// Generates the custom file, or appends a commented-out line for each key it has no line for, commented or not.
-	// Never rewrites what is there.
-	Sync SyncCustom(const std::filesystem::path& a_custom, std::span<const std::string_view> a_keys);
+	// Generates the custom file, or adds a commented-out line for each key of a_section it has no line for, commented
+	// or not, at the end of that section. Never changes a line that is there.
+	Sync SyncCustom(const std::filesystem::path& a_custom, std::span<const std::string_view> a_keys,
+		std::string_view a_section = "Fixes");
 }
