@@ -1,6 +1,7 @@
 // Crash Fix Compendium: one DLL holding several crash fixes, each in src/fixes/<Key>.cpp, which registers itself.
 // This file reads the switches, yields to an old standalone DLL, installs each fix and writes its status line.
-// A new fix is one file and one line in dist/SKSE/Plugins/CrashFixCompendium.ini (Tools/check_source.py).
+// A new fix is one file and one line in dist/SKSE/Plugins/CrashFixCompendium.ini, in the section it registers
+// (Tools/check_source.py).
 // A line logged below error level must not contain error / fail / failed / failure: a scan of the log would flag it.
 
 #include "fix.h"

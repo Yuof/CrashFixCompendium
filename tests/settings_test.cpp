@@ -406,7 +406,38 @@ namespace
 		const auto                 s = Settings::SyncCustom(kCustom, keys);
 		CHECK(!s.error.empty());
 		CHECK(Get(kCustom) == old);
-		CHECK(!fs::exists(fs::path(kCustom) += L".tmp"));
+	}
+
+	// why a line goes into the section that is there: Windows reads a key only from a section's first header
+	void second_header_is_not_read()
+	{
+		Reset();
+		Put(kCustom, "[Fixes]\r\nPathIdle=0\r\n[Reports]\r\n[Fixes]\r\nOther=1\r\n");
+		CHECK(Settings::Read(kShipped, kCustom, "PathIdle").from == Settings::From::kCustom);
+		CHECK(Settings::Read(kShipped, kCustom, "Other").from == Settings::From::kShipped);
+	}
+
+	// both syncs the way main.cpp runs them at start: Fixes, then Reports
+	void start_up_sync()
+	{
+		constexpr std::string_view fixes[] = { "PathIdle", "New" };
+		constexpr std::string_view reports[] = { "Scan" };
+
+		Reset();  // a first start: no file
+		CHECK(Settings::SyncCustom(kCustom, fixes).generated);
+		CHECK(Settings::SyncCustom(kCustom, reports, "Reports").added == std::vector<std::string>{ "Scan" });
+		CHECK(Get(kCustom) == kHeader + ";PathIdle=1\r\n;New=1\r\n[Reports]\r\n;Scan=1\r\n");
+
+		Reset();  // a 1.3.0 player's file
+		Put(kCustom, kHeader + ";PathIdle=1\r\n");
+		CHECK(Settings::SyncCustom(kCustom, fixes).added == std::vector<std::string>{ "New" });
+		CHECK(Settings::SyncCustom(kCustom, reports, "Reports").added == std::vector<std::string>{ "Scan" });
+		CHECK(Get(kCustom) == kHeader + ";PathIdle=1\r\n;New=1\r\n[Reports]\r\n;Scan=1\r\n");
+
+		constexpr std::string_view later[] = { "PathIdle", "New", "Later" };  // the next update's fix
+		CHECK(Settings::SyncCustom(kCustom, later).added == std::vector<std::string>{ "Later" });
+		CHECK(Settings::SyncCustom(kCustom, reports, "Reports").added.empty());
+		CHECK(Get(kCustom) == kHeader + ";PathIdle=1\r\n;New=1\r\n;Later=1\r\n[Reports]\r\n;Scan=1\r\n");
 	}
 
 	// an empty exe path must not become relative INI paths: GetPrivateProfile* would look in the Windows folder
@@ -455,6 +486,8 @@ int main()
 	sync_adds_a_second_section();
 	sync_inserts_into_its_section();
 	sync_insert_keeps_a_readonly_file();
+	second_header_is_not_read();
+	start_up_sync();
 	plugins_folder_from_the_exe();
 	milestone_is_powers_of_ten();
 	find_call_wants_exactly_one();

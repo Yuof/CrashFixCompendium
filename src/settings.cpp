@@ -87,24 +87,12 @@ namespace
 		return out.write(a_bytes.data(), static_cast<std::streamsize>(a_bytes.size())).flush().good();
 	}
 
-	// Through a temporary file, so a failed write leaves the old file as it was
-	bool Replace(const std::filesystem::path& a_file, std::string_view a_bytes)
+	// In place, like Append: a temporary file renamed over it would leave MO2's Overwrite holding the player's file.
+	// A read-only or locked file fails to open, before anything is written.
+	bool Rewrite(const std::filesystem::path& a_file, std::string_view a_bytes)
 	{
-		auto temp = a_file;
-		temp += L".tmp";
-		{
-			std::ofstream out(temp, std::ios::binary | std::ios::trunc);
-			if (!out.write(a_bytes.data(), static_cast<std::streamsize>(a_bytes.size())).flush()) {
-				return false;
-			}
-		}
-		std::error_code ec;
-		std::filesystem::rename(temp, a_file, ec);
-		if (ec) {
-			std::filesystem::remove(temp, ec);
-			return false;
-		}
-		return true;
+		std::ofstream out(a_file, std::ios::binary | std::ios::trunc);
+		return out && out.write(a_bytes.data(), static_cast<std::streamsize>(a_bytes.size())).flush().good();
 	}
 }
 
@@ -198,7 +186,7 @@ namespace Settings
 				--last;
 			}
 			const auto at = static_cast<std::size_t>(last->data() - text.data()) + last->size() + 1;
-			if (!Replace(a_custom, text.substr(0, at) + newLines + text.substr(at))) {
+			if (!Rewrite(a_custom, text.substr(0, at) + newLines + text.substr(at))) {
 				return { .error = "the file is read-only or locked" };
 			}
 			return { .added = std::vector<std::string>(missing.begin(), missing.end()) };
