@@ -1,8 +1,8 @@
 // SkyrimSE+0A8497F `call [r10+0x08]` or +05434A0 `call [r10+0x10]` (1.6.1170) in an actor animation job, with
 // hkaFootPlacementIkSolver in RDI. Starts once more than 50 characters are loaded nearby.
-// Cause: BGSFootIkRaycastInterfaceDB starts with 50 entries and hands out pointers into its array. The 51st
-// character's lookup grows the array by 50, which reallocates it and frees the block other characters still cast
-// through.
+// Cause: BGSFootIkRaycastInterfaceDB starts with 50 entries and hands out pointers into its array. A lookup that
+// finds no free slot grows the array by 50. A grow past the capacity reallocates the array and frees the block other
+// characters still cast through.
 // Fix: the constructor's resize(50) becomes resize(1024), then resize(50): capacity 1024, size 50. Later grows stay
 // inside that block. No per-frame cost, 56 KB of memory. Install finds the call by its target and the
 // `mov edx, 50; mov rcx, rbx` before it; anything else there stays unpatched.

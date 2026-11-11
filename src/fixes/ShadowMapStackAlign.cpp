@@ -2,10 +2,11 @@
 // Cause: Engine Fixes' BSLightingShaderPropertyShadowMap fix jumps out of
 // BSLightingShaderProperty::GetRenderPasses_ShadowMapOrMask into a stub that calls its detour after
 // `push rbx; sub rsp, 0x20`. The push misaligns the stack on every call. tbbmalloc's cache cleanup stores SSE
-// registers with aligned moves and faults. Upstream: aers/EngineFixesSkyrim64 issue #102.
-// Fix: find Engine Fixes' stub through the jump at the hook site, compare it byte for byte, and point the jump at our
-// own stub: same register setup, same continuation, aligned stack. Anything else there (no Engine Fixes, its fix
-// off, a release with a changed stub) stays unpatched.
+// registers with aligned moves and faults. The diagnosis and the aligned stub come from aers/EngineFixesSkyrim64
+// issue #102.
+// Fix: find Engine Fixes' stub through the jump at the hook site, compare it byte for byte, and point the jump at a
+// stub with the issue's sequence: same register setup, same continuation, aligned stack. Anything else there (no
+// Engine Fixes, its fix off, a release with a changed stub) stays unpatched.
 
 #include "fix.h"
 
@@ -13,7 +14,8 @@ namespace ShadowMapStackAlign
 {
 	namespace
 	{
-		// Engine Fixes 7.0.19 / 7.0.20 (src/fixes/bslightingshaderproperty_shadowmap.h, Patch): ? = an address
+		// Engine Fixes 7.0.15 to the 7.0.21 beta and alandtse's fork 7.13.0
+		// (src/fixes/bslightingshaderproperty_shadowmap.h, Patch): -1 = a byte of an address
 		constexpr std::array<std::int16_t, 51> kEFStub{
 			0x48, 0x89, 0xF1,                                // mov rcx, rsi
 			0x48, 0x8B, 0x94, 0x24, 0xF8, 0x00, 0x00, 0x00,  // mov rdx, [rsp+0xF8]
