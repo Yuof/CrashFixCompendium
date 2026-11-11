@@ -24,7 +24,8 @@ DLL, each with its own on/off switch. VR is not supported.
 loose and in uncompressed .bsa archives, that the game won't play, so the file behind an `AudioFormat` line can be
 found.
 
-Each fix's own comment in `src/fixes/<Key>.cpp` explains the bug and the patch. What changed in each version:
+Each fix's own comment in `src/fixes/<Key>.cpp` explains the bug and the patch. How to reproduce each crash, its
+cause in the game's code and why the fix is what it is: [docs/](docs/README.md). What changed in each version:
 [CHANGELOG.md](CHANGELOG.md).
 
 ## Switches
