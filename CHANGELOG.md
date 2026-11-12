@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.0
+- New fix: Ragdoll World Lock (switch `RagdollWorldLock`, on by default). A crash at `SkyrimSE.exe+0B6AA54`
+  (1.6.1170) with "NPC COM" / "NPC L Thigh" and an hkbRagdollDriver in the crash log. The game switched a ragdoll
+  joint on or off before the joint was in the physics world. The most likely cause is a counter in the physics
+  world that two game functions change without taking the world's lock: one for the loaded area's bound, one for a
+  ragdoll's saved pose. A lost write leaves the counter wrong, and from then on the world queues every change. Both
+  functions now take the lock when it is free and queue their change when another thread holds it. They never wait
+  for it.
+
 ## 1.4.0
 - New fix: Audio Format (switch `AudioFormat`, on by default). A sound file in a format the game can't read (a
   32-bit float or ADPCM .wav, an .mp3 or .ogg renamed, a cut-off file) or whose header says 0 channels made the game

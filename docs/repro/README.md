@@ -17,6 +17,14 @@ The helpers they use:
 | `g.spawn(base)` | `PlaceAtMe` of an actor base at the player |
 | `walk(seconds)` | hold the forward key |
 | `check(name, ok, detail)` | record a step's result; a failed check ends the run |
+| `c.stage()` | `cow Tamriel 14 25` (a beach) unless the player is there, then `set gamehour to 12` |
+| `c.reset_player()` | the player back to the same spot on that beach, facing north, health and stamina topped up |
+| `c.equip(loadout)` | `UnequipAll`, then the loadout's weapons (`"sword+shield"`: an iron sword and a shield) added and equipped, weapon drawn |
+| `c.set_pov("3p")` | third-person camera |
+| `c.spawn()` | a bandit placed 100 units in front of the player, facing it, with a sword and shield, `SetDontMove` |
+| `c.face(ref)` | the `SetAngle` step that turns the player toward `ref` |
+| `c.scen(steps)` | run those steps as one `g.tool("scenario", ...)` |
+| `c.remove(ref)` | `StopCombat`, `SetRestrained`, two seconds, then `Disable` and `Delete` |
 
 `0x14` is the player, `0x3B` the X marker, `0x38` the GameHour global, `0x1C789` Firebolt.
 
@@ -31,6 +39,7 @@ The helpers they use:
 | [mknif.py](mknif.py), [nifstring.py](nifstring.py) | NifStringIndex |
 | [longwait.py](longwait.py) | UIMessageQueue |
 | [mkwav.py](mkwav.py), [uisound.py](uisound.py) | AudioFormat |
+| [ragfight.py](ragfight.py), [ragdoll_force.cpp](ragdoll_force.cpp), [counter_watch.cpp](counter_watch.cpp), [world_busy.cpp](world_busy.cpp) | RagdollWorldLock |
 | [LateHookRaceProbe.cpp](LateHookRaceProbe.cpp) | StartupHook |
 
 The `.cpp` files are test plugins, or the part of one that matters.

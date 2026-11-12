@@ -19,6 +19,7 @@ DLL, each with its own on/off switch. VR is not supported.
 | `ShoutEmptyWord` | The unlock key in the Magic menu on a shout with fewer than three words: the game steps into an empty word slot |
 | `NifStringIndex` | A mesh in which a block names a string past the end of the file's string list: the game reads whatever follows the list as the string |
 | `AudioFormat` | A sound file the game can't read (32-bit float, ADPCM, an .mp3 renamed) or whose header says 0 channels: XAudio2 gets a voice with 0 channels (`XAudio2_7.dll+25181`) |
+| `RagdollWorldLock` | The game switches an NPC's ragdoll joint on or off before that joint is in the physics world (`SkyrimSE.exe+0B6AA54`). Most likely cause: two game functions change the physics world's counter of changes in progress without taking its lock |
 
 `AudioFormatScan` (off by default, in the INIs' `[Reports]` section) is not a fix: it lists every sound file in Data,
 loose and in uncompressed .bsa archives, that the game won't play, so the file behind an `AudioFormat` line can be

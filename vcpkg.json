@@ -1,6 +1,6 @@
 {
   "name": "crashfixcompendium",
-  "version-string": "1.4.0",
+  "version-string": "1.5.0",
   "description": "SKSE plugin: All-in-one SKSE crash fixes",
   "license": "GPL-3.0-or-later",
   "dependencies": [
