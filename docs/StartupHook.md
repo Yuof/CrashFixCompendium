@@ -5,7 +5,7 @@ The game crashes during the first loading screen, before the main menu. The log 
 It is rare.
 
 ## How to reproduce it
-The window is a few microseconds wide, so I widen it. A test plugin ([repro/LateHookRaceProbe.cpp](repro/LateHookRaceProbe.cpp)) replaces `VirtualProtect` and sleeps 500 ms at the exact moment another plugin stands between the two halves of installing a hook.
+The window is a few microseconds wide, so I widen it. A test plugin ([repro/LateHookRaceProbe.cpp](repro/LateHookRaceProbe.cpp)) replaces `VirtualProtect` and sleeps 500 ms at the exact moment another plugin is between the two writes of a hook.
 
 1. Install a plugin that hooks one of the two places above after the game's data has loaded. My load order has five that hook the input poll, SmartTalk 1.0.6 among them, and a loading-screen mod's DLL that hooks the renderer.
 2. Install the probe, tell it in its ini which of the two to delay, and start the game.
@@ -70,7 +70,7 @@ FF 25 00 00 00 00  <address of the plugin's hook>   ; jmp [rip]
 ```
 
 ## Why the fix looks like this
-The thread that hits the breakpoint did nothing wrong. It ran a jump a moment before the jump existed. So the handler waits until the jump is there and sends the thread through it.
+The thread that hits the breakpoint executed valid code too early: the jump it ran did not exist yet. The handler waits until the jump is written and resumes the thread at it.
 
 It leaves everything else alone. It acts only on a breakpoint in private executable memory, and it resumes only into a complete jump with an executable target. Anything else goes on to the next handler untouched, and so does this case after one second. A crash logger still gets its crash.
 
@@ -84,4 +84,4 @@ The cause is fixed in CommonLib: CommonLibSSE-NG pull request #465 swaps the ord
 Asking the six authors to hook at plugin load would work as well, one plugin at a time, and only until another plugin does the same.
 
 ## What it doesn't cover
-A late 6-byte hook fails as an access violation, and the handler passes that on. So does a thread that reads a slot in the nanoseconds while the plugin writes its bytes. Neither has turned up in a crash log. If one does, the handler gets an access-violation path.
+A late 6-byte hook fails as an access violation, and the handler passes that on. So does a thread that reads a slot in the nanoseconds while the plugin writes its bytes. Neither has appeared in a crash log. If one does, the handler needs an access-violation path.

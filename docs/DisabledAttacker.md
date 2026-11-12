@@ -18,7 +18,7 @@ Even aimed like that, about 1% of the disables fall into the window. When one do
 pending hit of FF001FA0 dropped
 ```
 
-A direct test is quicker: call Precision's `PendingHit::Run` from a test plugin with a hit that has no attacker. With the fix on, the game survives and logs the dropped hit.
+A direct test is quicker: call Precision's `PendingHit::Run` from a test plugin with a hit that has no attacker. With the fix on, the game keeps running and logs the dropped hit.
 
 ## Where I met it
 In scripts that disable actors: one deleted a bandit in mid-attack, another hid every actor in a hall while one of them was swinging. In play it takes a script or a console command that removes an NPC in mid-swing.

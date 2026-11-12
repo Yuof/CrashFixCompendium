@@ -88,6 +88,6 @@ The table ends up three times larger than it needs to be, because the game's `x 
 ## What else I considered
 Fixing the meshes was the first alternative: strip the unused vertices from the affected ones and ship them as a patch. Every update of those mods, and every new mod with such a mesh, would need it again.
 
-A bounds check on the lookup would also stop the overrun, but it needs new code in the middle of the function, and a vertex past the table would have nowhere to be remembered. The resize is one byte.
+A bounds check on the lookup would also stop the overrun, but it needs new code in the middle of the function, and a vertex past the table would have no table entry to record its decal vertex. The resize is one byte.
 
 Scanning for such meshes after every mod install detects the problem without fixing it, and it has to be repeated after every install.

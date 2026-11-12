@@ -22,7 +22,7 @@ A player reported it on the mod page: "hitting unlock on a shout with less than 
 ## Why it crashes
 A shout has three word slots. The game has a small helper that answers "what is the last word of this shout the player knows?" as a slot number. The Magic menu asks it, then walks the slots from 0 to that number and calls each word.
 
-The helper walks the slots until it finds a word the player doesn't know. It skips an empty slot the same way it skips a known word, and that is the bug. For a shout that is [known word, empty, empty] it runs off the end and answers 2. The menu then calls the "word" in slot 1, which is a null pointer.
+The helper walks the slots until it finds a word the player doesn't know. It skips an empty slot the same way it skips a known word, and that is the bug. For a shout that is [known word, empty, empty] it reaches the end and returns 2. The menu then calls the "word" in slot 1, which is a null pointer.
 
 R12 = 2 in the crash log is that answer, still in a register.
 
@@ -94,7 +94,7 @@ if (last >= 0) {
 ## Why the fix looks like this
 The menu's loop is fine if the helper returns the right number, so I fixed the helper. That also covers two more places in the Magic menu with the same loop: the unlock prompt and the code that spends the dragon soul.
 
-My helper still skips an empty slot in front of a word. The game has shouts built like that ([empty, word, word], one of the dragons' frost breaths), and they must keep their answer.
+My helper still skips an empty slot in front of a word. The game has shouts built like that ([empty, word, word], one of the dragons' frost breaths), and their result must not change.
 
 The helper has eight callers. The other five:
 
@@ -107,6 +107,6 @@ Install compares the helper's first 48 bytes with what I expect and leaves the g
 ## What else I considered
 The smallest possible patch is one byte: retarget a jump so the helper stops at any empty slot. It fixes the crash and breaks the shouts with an empty slot in front, which then get a different answer than the game gives them.
 
-A hook that calls the original helper and corrects its result would work, but there is nothing in the original worth keeping. Its answer is the bug.
+A hook that calls the original helper and corrects its result would work, but the original computes nothing that is needed. Its result is the bug.
 
 Null checks in the menu's loops would mean three patches in three places for one wrong number.

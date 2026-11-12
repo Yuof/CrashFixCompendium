@@ -26,7 +26,7 @@ Every frame, each character's animation job asks the table for its entry. The lo
 
 When all slots are taken, the lookup grows the array by 50. Growing past the array's capacity allocates a new block, copies the entries over and frees the old block. Every other job that is mid-pass still holds a pointer into the old block. Its next ray cast reads a vtable out of freed memory and calls through it.
 
-The lock doesn't help. It protects the lookup. The pointer leaves the lock with the caller.
+The lock does not prevent this. It protects the lookup only, and the caller uses the pointer after the lock is released.
 
 ## The code, with the fix in
 The fix re-points one call in the table's constructor. The decompiled constructor with that call replaced:
@@ -107,14 +107,14 @@ CachedRaycastData* BGSFootIkRaycastInterfaceDB::GetOrAssignSlot(BGSFootIkRaycast
 }
 ```
 
-Install wants exactly one call to the resize in the constructor, with `mov edx, 50; mov rcx, rbx` in front of it. It also wants the table not to exist yet. Otherwise it patches nothing.
+Install expects exactly one call to the resize in the constructor, with `mov edx, 50; mov rcx, rbx` in front of it. It also requires that the table does not exist yet. Otherwise it patches nothing.
 
 ## Why the fix looks like this
 I reserve the memory and leave the entry count alone. The array has 50 entries as before, so everything that walks the table costs what it always did. But its block has room for 1024, so growing never moves it, until more than 1024 characters use foot IK at the same moment. Past that point the game behaves as it does without the fix.
 
 It costs 1024 x 0x38 bytes, 56 KB. Nothing per frame.
 
-I do it in the constructor because nothing can hold a pointer into the table that early. The constructor runs well after SKSE loads the plugins, so a patch written at plugin load arrives in time.
+I do it in the constructor because nothing can hold a pointer into the table that early. The constructor runs well after SKSE loads the plugins, so a patch written at plugin load is in place before the constructor runs.
 
 If the table already exists when I install, I leave it. Resizing it then could free a block in use, which is the bug.
 

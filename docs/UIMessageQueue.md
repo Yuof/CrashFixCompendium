@@ -13,7 +13,7 @@ Every time something opens, closes or updates a menu, it sends a message through
 
 `AddMessage` reads the counter, writes the menu's name into that message, queues the message and then adds one to the counter. Writing the name releases the name the message held from last time. `AddMessage` takes no lock.
 
-That would be fine if only the main thread sent UI messages. It isn't so. In one test launch the main thread made about 1,400 calls and other threads about 300: animation jobs, HUD plugins that react to them, and the game's own workers.
+That is safe only if a single thread sends UI messages. Several do. In one test launch the main thread made about 1,400 calls and other threads about 300: animation jobs, HUD plugins that react to them, and the game's own workers.
 
 Two threads that read the same counter value pick the same message. Both write a name into it, and both release the old name. Menu names are shared, reference-counted strings, so the old name loses two references where it should lose one. After enough collisions the count reaches zero while the UI still holds the string. In a single session the count of "Fader Menu" drops from 5 to 1 while at least four real holders are alive.
 
@@ -95,7 +95,7 @@ void UIMessageQueue::ProcessCommands(UIMessageQueue* queue)
 Install checks the first bytes of each function and the instruction that reads the counter. If another plugin has already put a jump at an entry, I chain to it, so that plugin's code runs inside my lock. If the entry holds anything else, I patch nothing.
 
 ## Why the fix looks like this
-One lock around both functions means no two threads can read the same counter value, and the reset can't cut into an add.
+One lock around both functions means no two threads can read the same counter value, and the reset cannot interleave with an add.
 
 The lock cannot deadlock. `AddMessage`'s push takes only the queue's own internal lock and calls nothing else, and the UI's main processing lock is always taken before mine, never after.
 
@@ -104,4 +104,4 @@ The cost is small. In a whole test session a thread had to wait for the lock abo
 ## What else I considered
 Locking `AddMessage` alone isn't enough, because `ProcessCommands` resets the counter without a lock too, from the main thread and from the loading thread.
 
-A spin lock that yields would avoid parking a thread in the kernel. The mutex hasn't shown up as a cost, so it stays.
+A spin lock that yields would avoid parking a thread in the kernel. The mutex has no measurable cost, so I kept it.

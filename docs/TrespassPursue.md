@@ -13,7 +13,7 @@ You walk into someone's house while they are home, the owner starts to escort yo
 
 Script: [repro/trespass.py](repro/trespass.py).
 
-Whether it crashes is a matter of chance. It depends on what the memory allocator left in one slot the game forgets to fill, and about 6% of the packages get the crashing value. A few runs of the script are usually enough for a crash.
+Whether it crashes is a matter of chance. It depends on what the memory allocator left in one slot the game leaves unset, and about 6% of the packages get the crashing value. A few runs of the script are usually enough for a crash.
 
 That rate is too low for an A/B, so I force the value. A test plugin writes it into the slot right inside the game's builder ([repro/trespass_force.cpp](repro/trespass_force.cpp)). Forced, the game crashes every time without the fix and never with it. With the fix on, each launch logs `parameter 2 set to no data`.
 

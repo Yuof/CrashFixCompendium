@@ -2,7 +2,7 @@
 
 Two arrows, spells or blood drops hit the same tree or the same actor in the same frame, and the game crashes. The log says `SkyrimSE.exe+0D1EEFE`, `lock xadd [rcx+0x08], eax`, with a small number like 0x1 or 0x10000 in RCX, on a job thread. On the stack: `NiNode::AttachChild`, the constructor of `BGSDecalNode`, `BGSDecalManager::ApplyDecal` and a projectile impact. The log names a "Skinned Decal Node".
 
-It needs the object's first decals. Once a tree or an actor has its decal node, the window is closed.
+It needs the object's first decals. Once a tree or an actor has its decal node, the race can no longer occur.
 
 ## How to reproduce it
 1. Riverwood, noon, `tgm`. Pick a pine. Trees are skinned meshes, like actors.
@@ -10,7 +10,7 @@ It needs the object's first decals. Once a tree or an actor has its decal node, 
 
 Script: [repro/treedecal.py](repro/treedecal.py) with `reset=1 volleys=40`.
 
-Run like that, the race happens two to four times per launch: two threads create the node at once, and the tree ends up with two decal nodes. It doesn't crash, though, because the bad state lasts only a few instructions. To crash on demand I stretch it to 50 ms with a test plugin ([repro/treedecal_widen.cpp](repro/treedecal_widen.cpp)). Stretched, the game crashes every time without the fix and never with it, mostly at `+0D1EEFE`, and the thread that crashes is the one the log has just caught inside the overlap.
+Run like that, the race happens two to four times per launch: two threads create the node at once, and the tree ends up with two decal nodes. It doesn't crash, though, because the bad state lasts only a few instructions. To crash on demand I stretch it to 50 ms with a test plugin ([repro/treedecal_widen.cpp](repro/treedecal_widen.cpp)). Stretched, the game crashes every time without the fix and never with it, mostly at `+0D1EEFE`, and the thread that crashes is the one last logged inside the overlap.
 
 ## Where I met it
 In a fight next to a pine: the address above with RCX = 0x10000 and a missile projectile among the objects. A blood mod was active that sprays three projectiles per heavy hit. That is enough to put several projectiles on one tree in the same frame.
@@ -20,7 +20,7 @@ The game applies decals on skinned objects from job threads. A skinned object ke
 
 Nothing on that path takes a lock. Two threads hitting the same object both find no node, and both attach one.
 
-The crash itself comes out of the child array. When it is full, `AttachChild` grows it, and the grow stores the new capacity before it stores the new buffer. A second `AttachChild` that arrives in between sees a capacity with room and skips the grow. It then writes into slot [size] of the old buffer, which is one slot past its end.
+The crash itself originates in the child array. When it is full, `AttachChild` grows it, and the grow stores the new capacity before it stores the new buffer. A second `AttachChild` that arrives in between sees a capacity with room and skips the grow. It then writes into slot [size] of the old buffer, which is one slot past its end.
 
 `AttachChild` releases whatever the slot held before it stores the new child. Here "the slot" is the first eight bytes of whichever heap object follows the old buffer. If those bytes are a small number, releasing it faults at `+0D1EEFE`. If they don't fault, the thread overwrites them with a pointer to its decal node. The next heap object's first eight bytes change from, for example, 0x1 to a `BGSDecalNode*`. That is silent heap damage, and a later crash inside the memory allocator is consistent with it.
 
@@ -111,7 +111,7 @@ bool BGSDecalManager::AddSkinnedDecal(BGSDecalManager* mgr, DecalWalk* walk)
 }
 ```
 
-Install looks for the call in `ApplyDecal` by its target and wants exactly one. Otherwise it patches nothing.
+Install looks for the call in `ApplyDecal` by its target and expects exactly one. Otherwise it patches nothing.
 
 ## Why the fix looks like this
 `ApplyDecal`'s call is the only way into the walk from outside. One lock around it turns "look for the node, else create and attach one" into a single step. The second hit waits a moment and then finds the first hit's node.

@@ -2,7 +2,7 @@
 
 The game crashes while a mesh loads, or a few seconds later. The crash log says `SkyrimSE.exe+0CEC826` or `+0CEC83E`, inside the copy of a `BSFixedString`, with `NiObjectNET::LoadBinary` on the stack.
 
-The mesh is broken: one of its blocks asks for a string the file doesn't have.
+The mesh is malformed: one of its blocks asks for a string the file doesn't have.
 
 ## How to reproduce it
 You need a .nif with a string index at or past its string count. I make one from a good mesh:
@@ -26,7 +26,7 @@ A player reported it on the mod page after debugging it themselves: a crash "rel
 ## Why it crashes
 A .nif stores each string once, in a list in its header. Blocks refer to strings by number. When the game loads a block it reads that number and copies the string out of the list.
 
-The reader knows one special number: 0xFFFFFFFF means "no string". It uses every other number as an index and never compares it with the size of the list. A number past the end makes it read whatever memory follows the list as a string. Usually that is not a valid string, and the string's reference count faults when the game touches it. If it happens to be a valid string, the block silently gets a wrong name.
+The reader treats one value specially: 0xFFFFFFFF means "no string". It uses every other number as an index and never compares it with the size of the list. A number past the end makes it read whatever memory follows the list as a string. Usually that is not a valid string, and the string's reference count faults when the game touches it. If it happens to be a valid string, the block silently gets a wrong name.
 
 Nineteen functions call the reader, among them the loaders of nodes, geometry, extra data and animation sequences. Any block type that stores a string can trigger it.
 
@@ -90,6 +90,6 @@ Install compares the reader's first 81 bytes with what I expect and leaves the g
 ## What else I considered
 Refusing the whole mesh is the stricter option. It removes an object from the game over one bad name, where an empty name leaves the object usable.
 
-Guards in each of the nineteen callers would do the same job nineteen times.
+Guards in each of the nineteen callers would duplicate the same check nineteen times.
 
 A log line without the file name would tell you a mesh is broken and not which one. The file name is what makes the line useful.

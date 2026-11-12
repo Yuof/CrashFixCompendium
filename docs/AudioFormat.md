@@ -23,11 +23,11 @@ In a player's crash report. Their log had the address above and a `LooseFileAsyn
 ## Why it crashes
 To play a sound, the game creates an XAudio2 voice and tells XAudio2 the sound's format: channels, sample rate and so on. It takes the format from the header of the sound file.
 
-XAudio2 2.7 trusts the channel count. It keeps its mixing buffers in a table indexed by `channels - 1`, and with 0 channels that index wraps to 4 billion. The read lands terabytes past the table.
+XAudio2 2.7 does not validate the channel count. It keeps its mixing buffers in a table indexed by `channels - 1`, and with 0 channels that index wraps to 4 billion. The read lands terabytes past the table.
 
 The game can end up with 0 channels in two ways. The plain one is a header that says 0, which nothing checks. The other is a header the game can't read at all. Its parser accepts PCM, xWMA and two other format tags and rejects everything else. On the synchronous path a rejected header ends the open with an error. On the asynchronous path the open reports success anyway, and the format keeps whatever the freshly allocated memory held, which is usually zeros.
 
-Before it creates the voice, the game also computes the sound's length by dividing the data size by the bytes per sample frame (PCM) or by the bits per sample (xWMA). A header that says 0 there crashes in that division, before XAudio2 gets involved.
+Before it creates the voice, the game also computes the sound's length by dividing the data size by the bytes per sample frame (PCM) or by the bits per sample (xWMA). A header that says 0 there crashes in that division, before the game calls XAudio2.
 
 ## The code, with the fix in
 The fix changes no code in the game. It replaces one entry in the vtable of `BSXAudio2GameSound`, so the game calls my function, and mine calls the game's.
@@ -107,13 +107,13 @@ Install checks that the vtable slot still holds the game's `Prepare` and that `O
 ## Why the fix looks like this
 `Prepare` is the last step before XAudio2, and every way of opening a sound goes through it. A check in front of it catches a bad format wherever it came from: a header that says 0, a header the parser rejected, a format that was never filled in.
 
-A refused sound fails through the game's own function for a failed open. To the rest of the game it looks like a missing file, which the game has always handled: the sound stays silent and everything else carries on.
+A refused sound fails through the game's own function for a failed open. To the rest of the game it looks like a missing file, which the game has always handled: the sound stays silent and the rest of the game is unaffected.
 
 The log gives the sound's id, a pair of hashes of its folder and file name. A hash doesn't name the file, so there is a second switch for that. `AudioFormatScan=1`, off by default and not a fix, reads the header of every sound file under Data, loose and in uncompressed .bsa archives, with the same rules as the game's parser. It lists each file the game can't play, together with the id that `AudioFormat` logs. Run it once after an `AudioFormat` line appears, then turn it off again.
 
 ## What else I considered
 Making the asynchronous open report its failure, as the synchronous one does, repairs the unreadable-header case at its source. It does nothing for a header that reads fine and says 0 channels, so the check in front of `Prepare` would still be needed.
 
-A check in the header parser has the same gap from the other side: it can reject 0 channels, and the asynchronous path would ignore the rejection.
+A check in the header parser is incomplete in the other direction: it can reject 0 channels, and the asynchronous path would ignore the rejection.
 
 Validating inside XAudio2 is not possible. XAudio2 2.7 is a system DLL.

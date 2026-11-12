@@ -6,7 +6,7 @@ You move around in the free camera (`tfc`, or a mod's photo or preview camera) w
 - `SkyrimSE.exe+083D0CD`, `mov eax, [rdx+rcx*4]`, with an index near 4 billion
 - `VCRUNTIME140.dll`, in memmove, `mov r8, [rdx]`, under `CombatGroup::RemoveMember`
 
-The log names `PlayerCharacter`, `CombatGroup`, or both. The first address alone proves nothing: it is the game's generic read lock, and other bugs end there too.
+The log names `PlayerCharacter`, `CombatGroup`, or both. The first address alone is not conclusive: it is the game's generic read lock, and other bugs end there too.
 
 ## How to reproduce it
 1. `tfc`.
@@ -24,7 +24,7 @@ Several times, always in my screenshot tool, which keeps the game in the free ca
 Normal play doesn't use the free camera, so normal play is safe. Screenshot sessions and photo-mode mods are not.
 
 ## Why it crashes
-The player belongs to a combat group while in combat. A job on a worker thread looks after that group every frame: it creates the group, adds and removes the player, and drops it when the fight ends.
+The player belongs to a combat group while in combat. A job on a worker thread maintains that group every frame: it creates the group, adds and removes the player, and drops it when the fight ends.
 
 `Main::Update` has a special case for the free camera. In that mode it runs a cut-down update of the player on the main thread, and that update ends by calling the same combat-group upkeep. So in the free camera two threads update the same group in the same frame, and neither takes a lock.
 
@@ -80,14 +80,14 @@ void PlayerCharacter::UpdateInFreeCamera(PlayerCharacter* player, float delta, b
 }
 ```
 
-In bytes: the `call` at `SkyrimSE+733FEC` (`E8 6F FC 02 00`) becomes `0F 1F 44 00 00`. Install looks for the call by its target and wants exactly one in the function. Otherwise it patches nothing.
+In bytes: the `call` at `SkyrimSE+733FEC` (`E8 6F FC 02 00`) becomes `0F 1F 44 00 00`. Install looks for the call by its target and expects exactly one in the function. Otherwise it patches nothing.
 
 ## Why the fix looks like this
-The cut-down player update has two callers: the free-camera branch of `Main::Update`, and the code that finishes loading a save. The worker's job updates the group every frame no matter which camera is on. So this call never did anything the job doesn't do. It only did it a second time, on the wrong thread. I took it out, and the free camera now treats the combat group like every other camera does.
+The cut-down player update has two callers: the free-camera branch of `Main::Update`, and the code that finishes loading a save. The worker's job updates the group every frame no matter which camera is on. So this call never did anything the job doesn't do. It only repeated the job's work on a second thread. I took it out, and the free camera now treats the combat group like every other camera does.
 
 Loading a save still updates the group. That path has its own call.
 
 One behaviour changes. The jobs don't run while a menu pauses the game or after `tfc 1`. In the free camera with the game paused, the group used to get its update from the main thread and now gets none. Every other camera has always behaved that way under a pause.
 
 ## What else I considered
-A lock around the combat-group functions works just as well. It stops the crash too. The lock is contended a couple of thousand times per session, with waits up to 218 microseconds. I kept the nop because the call is a duplicate, and removing a duplicate is better than guarding it. If this race ever shows up without the free camera, the lock is the fix to use.
+A lock around the combat-group functions also stops the crash. The lock is contended a couple of thousand times per session, with waits up to 218 microseconds. I kept the nop because the call is a duplicate, and removing a duplicate is better than guarding it. If this race ever shows up without the free camera, the lock is the fix to use.

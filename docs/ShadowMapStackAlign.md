@@ -28,9 +28,9 @@ Engine Fixes' ShadowMap fix jumps out of the middle of one of the game's functio
 
 At the point where the game's function gets interrupted, its stack is aligned. The stub then pushes one 8-byte register before its call. Now the stack is off by 8, and it stays off for everything the C++ function does.
 
-Most code never stores an SSE register to the stack and never notices. The allocator's cache cleanup does. The C++ function allocates memory, and occasionally that allocation triggers the cleanup.
+Most code never stores an SSE register to the stack and is unaffected. The allocator's cache cleanup does. The C++ function allocates memory, and occasionally that allocation triggers the cleanup.
 
-A misaligned stack faults. It doesn't corrupt anything on the way.
+A misaligned stack faults. It does not corrupt memory.
 
 ## The code, with the fix in
 The fix re-points one jump in the game's code: the jump Engine Fixes put there. It doesn't touch EngineFixes.dll. Both stubs are a dozen instructions of assembly, so there is nothing to decompile. Here they are side by side.
@@ -69,7 +69,7 @@ mov  r15, rax
 jmp  [rip]                 ; the same way back
 ```
 
-Install follows the jump from the game's function to Engine Fixes' stub and compares all 51 bytes of it with the stub I know, leaving the two addresses open. It also checks that the stub jumps back to where I expect. Only then does it write the corrected stub and re-point the jump.
+Install follows the jump from the game's function to Engine Fixes' stub and compares all 51 bytes of it with the known stub, leaving the two addresses open. It also checks that the stub jumps back to where I expect. Only then does it write the corrected stub and re-point the jump.
 
 ## Why the fix looks like this
 The stub is the issue author's work: same arguments, same function, same way back, with the stack saved, aligned for the call and restored. I use it unchanged.

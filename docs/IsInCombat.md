@@ -2,7 +2,7 @@
 
 The game crashes while a console command runs. Often there is no crash log at all, only the Windows event: SkyrimSE.exe, 0xc0000005, fault offset 0xcc90cf. When there is a log, it says `SkyrimSE.exe+0CC90CF`, `cmp [rdi], eax`, under `TESObjectREFR::GetDisplayFullName`.
 
-That address alone proves nothing. It is the game's generic read lock, and the FreeCamera race ends there too.
+That address alone is not conclusive. It is the game's generic read lock, and the FreeCamera race ends there too.
 
 ## How to reproduce it
 1. Open the console and click a chair. Any reference that isn't an actor will do.
@@ -13,7 +13,7 @@ Without the fix the game crashes. With it the console says "Wooden Bar Stool is 
 ## Where I met it
 In the middle of a console `cow`. Nobody had typed `IsInCombat`.
 
-The mod involved was [Smart NPC Potions](https://www.nexusmods.com/skyrimspecialedition/mods/40102). It does nothing wrong. It restarts a quest, `NPCPotion_NPCQuest`, every five seconds, and the quest's three aliases each test `IsInCombat` first on every reference in the loaded area. That comes to more than 65,000 such tests on things that aren't actors in two minutes. Those normally run on job threads, where they are harmless.
+The mod involved was [Smart NPC Potions](https://www.nexusmods.com/skyrimspecialedition/mods/40102). The mod is not at fault. It restarts a quest, `NPCPotion_NPCQuest`, every five seconds, and the quest's three aliases each test `IsInCombat` first on every reference in the loaded area. That comes to more than 65,000 such tests on things that aren't actors in two minutes. Those normally run on job threads, where they are harmless.
 
 A console `cow` or `coc` changes that. The cell change makes the game run its story manager right there, on the thread that executes the console command. If the quest restarts in that moment, its aliases fill while the console command is still running, and every one of those tests runs in console mode.
 
@@ -23,7 +23,7 @@ So you need two things at once: a console command that moves the player, typed b
 While a console command runs, condition functions print their result to the console. `IsInCombat` prints "X is in combat" or "X is not in combat".
 
 The function only accepts an actor as its subject. For anything else it sets its subject to null and its answer to
-0. Then, in console mode, it prints the subject's name, and it asks the null subject for it.
+0. Then, in console mode, it prints the subject's name, and it reads the name from the null subject.
 
 Two other functions print a name this way, `GetActorWarmth` and `IsOverEncumbered`. Both check their subject first.
 
@@ -100,10 +100,10 @@ bool IsInCombat(TESObjectREFR* subject, void* param1, void* param2, double* resu
 
 With the fix, a non-actor in console mode never reaches this function.
 
-Install finds the table entry by the command's name. It wants both pointers and exactly one parameter, and it changes nothing otherwise.
+Install finds the table entry by the command's name. It requires both pointers and exactly one parameter, and it changes nothing otherwise.
 
 ## Why the fix looks like this
-The game already had the right answer. It set the result to 0 and then crashed printing it. So my functions return that 0 and, on the console path, print the line with the reference's real name.
+The game had already computed the correct result. It set the result to 0 and then crashed printing it. So my functions return that 0 and, on the console path, print the line with the reference's real name.
 
 Actors, and every call outside console mode, go straight to the game's functions. Nothing changes for them.
 
