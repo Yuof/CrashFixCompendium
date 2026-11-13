@@ -12,6 +12,9 @@ The helpers they use:
 | `g.call(script, function, *args, on=form)` | call a Papyrus function on a form, e.g. `ObjectReference.Disable` |
 | `g.tool("scenario", steps=..., repeat=n)` | run a list of steps inside the game, frame-accurate, `n` times |
 | `g.tool("inspect", kind="refs", ...)` | list references near the player |
+| `g.until(what, test, timeout, every)` | poll `test` until it is true, fail the run after `timeout` seconds |
+| `g.running()` | whether SkyrimSE.exe still runs |
+| `skse_log_since_save()` | the lines skse64.log got since the step's save |
 | `g.tool("input", ...)`, `g.tool("menu", ...)`, `g.tool("gfx", ...)` | press a key, open a menu, read or call into a menu's Flash movie |
 | `g.wait_hours(h)` | the wait menu, `h` hours |
 | `g.spawn(base)` | `PlaceAtMe` of an actor base at the player |

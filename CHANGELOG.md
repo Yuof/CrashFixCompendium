@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0
+- New fix: SKSE Stack Lookup (switch `SkseStackLookup`, on by default). A crash while saving at
+  `skse64_1_6_1170.dll+5D51F` (SKSE 2.2.8) with `rax = 0x80000003`, or a mod event that never arrives. Before a save,
+  SKSE checks that each script holding a ModEvent, UICallback or SpawnerTask handle is still running. That check
+  reads the script's stack with Skyrim LE's layout. The fix makes it check only that the stack exists. An SKSE
+  without that check is left alone.
+
 ## 1.5.0
 - New fix: Ragdoll World Lock (switch `RagdollWorldLock`, on by default). A crash at `SkyrimSE.exe+0B6AA54`
   (1.6.1170) with "NPC COM" / "NPC L Thigh" and an hkbRagdollDriver in the crash log. The game switched a ragdoll
