@@ -286,17 +286,14 @@ namespace
 		CHECK(none.Why() != two.Why());
 	}
 
-	void abs_jump_round_trip()
+	void abs_jump_detected()
 	{
-		std::uint8_t           code[kAbsJumpSize]{};
-		constexpr std::uint8_t want[kAbsJumpSize]{ 0xFF, 0x25, 0, 0, 0, 0, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22,
-			0x11 };
-		const auto             at = reinterpret_cast<std::uintptr_t>(code);
-		CHECK(!IsAbsJump(at));
-		AbsJump(code, 0x1122334455667788ull);
-		CHECK(std::memcmp(code, want, sizeof(want)) == 0);
+		std::uint8_t code[kAbsJumpSize]{ 0xFF, 0x25, 0, 0, 0, 0, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11 };
+		const auto   at = reinterpret_cast<std::uintptr_t>(code);
 		CHECK(IsAbsJump(at));
 		CHECK(AbsJumpTarget(at) == 0x1122334455667788ull);
+		code[1] = 0x15;  // call [rip]
+		CHECK(!IsAbsJump(at));
 	}
 
 	void rel32_target_goes_both_ways()
@@ -307,21 +304,6 @@ namespace
 			std::memcpy(code + 1, &rel, sizeof(rel));
 			CHECK(Rel32Target(at) == at + 5 + rel);
 		}
-	}
-
-	void detour_bytes()
-	{
-		constexpr std::string_view prologue = "\x48\x8B\xC4\x53\x90";
-		std::uint8_t               stub[prologue.size() + kAbsJumpSize]{};
-		WriteOriginal(stub, prologue, 0x1000);
-		CHECK(Bytes(reinterpret_cast<std::uintptr_t>(stub), prologue.size()) == prologue);
-		CHECK(AbsJumpTarget(reinterpret_cast<std::uintptr_t>(stub + prologue.size())) == 0x1000 + prologue.size());
-
-		const auto patch = EntryPatch(16, 0x2000);
-		CHECK(patch.size() == 16);
-		CHECK(AbsJumpTarget(reinterpret_cast<std::uintptr_t>(patch.data())) == 0x2000);
-		CHECK(patch[kAbsJumpSize] == 0x90);
-		CHECK(patch[15] == 0x90);
 	}
 
 	// Windows reads "BOM + [Fixes]" as no section at all: the player's lines would be ignored while the log says active
@@ -491,9 +473,8 @@ int main()
 	plugins_folder_from_the_exe();
 	milestone_is_powers_of_ten();
 	find_call_wants_exactly_one();
-	abs_jump_round_trip();
+	abs_jump_detected();
 	rel32_target_goes_both_ways();
-	detour_bytes();
 
 	std::error_code ec;
 	SetFileAttributesW(kCustom.c_str(), FILE_ATTRIBUTE_NORMAL);

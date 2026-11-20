@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(
 	CrashFixCompendium
-	VERSION 1.6.0
+	VERSION 1.6.1
 	LANGUAGES CXX
 )
 
@@ -22,6 +22,9 @@ add_commonlibsse_plugin(
 	AUTHOR Yuof
 	SOURCES ${SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/version.rc
 )
+
+find_package(safetyhook CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE safetyhook::safetyhook)
 
 target_precompile_headers(${PROJECT_NAME} PRIVATE src/PCH.h)
 target_include_directories(${PROJECT_NAME} PRIVATE src)

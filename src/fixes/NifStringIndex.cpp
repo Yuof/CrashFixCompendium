@@ -4,11 +4,14 @@
 // Fix: replace the reader. A bad index gives the block an empty string, and the log names the file.
 
 #include "fix.h"
+#include "hook.h"
 
 namespace NifStringIndex
 {
 	namespace
 	{
+		SafetyHookInline g_hook;
+
 		constexpr REL::RelocationID kReadString{ 68995, 70352 };
 
 		// identical on SE and AE, up to `cmp eax, -1`
@@ -52,9 +55,9 @@ namespace NifStringIndex
 			return { Outcome::kFailed, "the .nif string reader is not the expected code, nothing patched" };
 		}
 
-		// 16 bytes = whole instructions
-		const auto patch = EntryPatch(16, reinterpret_cast<std::uintptr_t>(&ReadString));
-		REL::safe_write(target, patch.data(), patch.size());
+		if (const auto why = HookEntry(g_hook, target, &ReadString); !why.empty()) {
+			return { Outcome::kFailed, std::format("the .nif string reader: {}, nothing patched"sv, why) };
+		}
 		return { Outcome::kActive,
 			"replaced the .nif string reader: a string index past the file's table reads as empty" };
 	}

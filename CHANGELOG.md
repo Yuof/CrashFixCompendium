@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.1
+- UI Message Queue: no longer crashes the game before the main menu with MiniMap Menu (Nexus 149508)
+  MiniMap Menu's hook resumes the game's code 5 bytes into `AddMessage`, which was the middle of this fix's 18-byte jump.
+  The jump is now 5 bytes. MiniMap Menu's hook still overrides my code (and all other mods hooking this) here,
+  so this fix won't run with MiniMap Menu enabled.
+- Disabled Attacker, Nif String Index, Shout Empty Word, Ragdoll World Lock and UI Message Queue hook their functions
+  with SafetyHook. The jump at each function's entry is now 5 bytes, so a plugin that hooks the same function later
+  the usual way no longer crashes the game.
+
 ## 1.6.0
 - New fix: SKSE Stack Lookup (switch `SkseStackLookup`, on by default). A crash while saving at
   `skse64_1_6_1170.dll+5D51F` (SKSE 2.2.8) with `rax = 0x80000003`, or a mod event that never arrives. Before a save,

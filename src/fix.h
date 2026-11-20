@@ -57,12 +57,6 @@ inline CallSearch FindCall(std::uintptr_t a_start, std::size_t a_span, std::uint
 constexpr std::uint8_t kAbsJumpOp[]{ 0xFF, 0x25, 0, 0, 0, 0 };
 constexpr std::size_t  kAbsJumpSize = sizeof(kAbsJumpOp) + sizeof(std::uintptr_t);
 
-inline void AbsJump(std::uint8_t* a_at, std::uintptr_t a_to)
-{
-	std::memcpy(a_at, kAbsJumpOp, sizeof(kAbsJumpOp));
-	std::memcpy(a_at + sizeof(kAbsJumpOp), &a_to, sizeof(a_to));
-}
-
 // volatile: StartupHook reads a slot that another thread is writing
 inline bool IsAbsJump(std::uintptr_t a_at)
 {
@@ -78,20 +72,6 @@ inline bool IsAbsJump(std::uintptr_t a_at)
 inline std::uintptr_t AbsJumpTarget(std::uintptr_t a_at)
 {
 	return *reinterpret_cast<const volatile std::uintptr_t*>(a_at + sizeof(kAbsJumpOp));
-}
-
-// a_prologue must be position-independent
-inline void WriteOriginal(std::uint8_t* a_stub, std::string_view a_prologue, std::uintptr_t a_entry)
-{
-	std::memcpy(a_stub, a_prologue.data(), a_prologue.size());
-	AbsJump(a_stub + a_prologue.size(), a_entry + a_prologue.size());
-}
-
-inline std::vector<std::uint8_t> EntryPatch(std::size_t a_size, std::uintptr_t a_hook)
-{
-	std::vector<std::uint8_t> patch(a_size, 0x90);
-	AbsJump(patch.data(), a_hook);
-	return patch;
 }
 
 enum class Outcome

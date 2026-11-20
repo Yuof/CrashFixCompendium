@@ -31,7 +31,7 @@ The reader treats one value specially: 0xFFFFFFFF means "no string". It uses eve
 Nineteen functions call the reader, among them the loaders of nodes, geometry, extra data and animation sequences. Any block type that stores a string can trigger it.
 
 ## The code, with the fix in
-The fix replaces the reader. Its first 16 bytes become a jump to my function, so none of the game's reader runs any more. Here is the reader as the game ships it (decompiled):
+The fix replaces the reader. Its first instructions become a 5-byte jump to my function, so none of the game's reader runs any more. Here is the reader as the game ships it (decompiled):
 
 ```c
 // NiStream, SkyrimSE+D1FF90 (Address Library 70352)

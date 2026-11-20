@@ -27,7 +27,7 @@ The helper walks the slots until it finds a word the player doesn't know. It ski
 R12 = 2 in the crash log is that answer, still in a register.
 
 ## The code, with the fix in
-The fix replaces the helper. Its first 16 bytes become a jump to my function, so none of the game's helper runs any more. Here is the helper as the game ships it (decompiled):
+The fix replaces the helper. Its first instructions become a 5-byte jump to my function, so none of the game's helper runs any more. Here is the helper as the game ships it (decompiled):
 
 ```c
 // TESShout, SkyrimSE+380CF0 (Address Library 23357)

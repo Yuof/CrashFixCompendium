@@ -90,7 +90,7 @@ A hit whose attacker is gone can no longer be applied. Dropping it is the only c
 
 The check sits in front of the whole function, so it covers both unchecked reads at once.
 
-I allocate the stub that holds the function's moved first bytes myself. SKSE's trampoline lives next to the game's executable, too far from Precision.dll for a 32-bit jump.
+The hook puts the moved first instructions in memory it finds near Precision.dll, so the jump at the entry is 5 bytes long. SKSE's own trampoline lives next to the game's executable, too far from Precision.dll for that. If no memory near Precision.dll is free, the fix patches nothing.
 
 ## What else I considered
 The right place for the check is Precision itself, and the three lines above are pull request #6 on its repository. I don't install my own build of Precision, though. I want fixes as separate DLLs and other people's mods as their authors shipped them. When a Precision release has the check, this fix is no longer needed.

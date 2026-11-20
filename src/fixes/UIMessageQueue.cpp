@@ -1,14 +1,13 @@
-// Crashes in whatever reads a menu's name next ("Fader Menu", "HUD Menu", ...): garbage length or text.
-// Cause: UIMessageQueue::AddMessage takes the next of its 64 pooled messages by reading the pool count (+0x378),
-// assigns the menu name (releasing the name the slot held) and increments the count. No lock, although job threads
-// queue UI messages too. Two threads take the same slot and both release its old name; the string pool frees a name
-// the UI still uses. ProcessCommands resets the count without a lock as well.
-// Fix: run both functions under one lock.
-// Both are the same code in 1.5.97, 1.6.1170 and 1.7.104; Install checks their prologues and the pool-count
-// instruction. An entry another plugin already detoured (jmp [rip] or a 5-byte jmp) gets chained, so that detour
-// runs inside the lock. Anything else stays unpatched.
+// Crashes in whatever reads a menu's name next ("Fader Menu", "HUD Menu", ...): the name has an invalid length or text.
+// Cause: UIMessageQueue::AddMessage takes no lock, and job threads queue UI messages too. Two threads that read the
+// same pool count (+0x378) fill the same pooled message, and each releases the menu name it held. The string pool
+// then frees a name that the UI still uses. ProcessCommands resets the count without a lock as well.
+// Fix: both functions run under one lock. Install checks their first bytes and the pool-count instruction, which are
+// the same in 1.5.97, 1.6.1170 and 1.7.104. A jump that another plugin put at an entry is chained, so its code runs
+// inside the lock. Any other code at an entry stays unpatched.
 
 #include "fix.h"
+#include "hook.h"
 
 namespace UIMessageQueue
 {
@@ -17,7 +16,7 @@ namespace UIMessageQueue
 		struct Target
 		{
 			REL::RelocationID id;
-			std::string_view  prologue;  // copied to the trampoline: no rip-relative bytes
+			std::string_view  prologue;  // the function's first bytes in the game's code
 			std::size_t       markerAt;
 			std::string_view  marker;  // the pool-count instruction
 			std::string_view  name;
@@ -45,6 +44,8 @@ namespace UIMessageQueue
 		using ProcessCommands_t = void (*)(RE::UIMessageQueue*);
 		AddMessage_t      g_addMessage = nullptr;
 		ProcessCommands_t g_processCommands = nullptr;
+		SafetyHookInline  g_addHook;
+		SafetyHookInline  g_processHook;
 
 		std::recursive_mutex g_lock;
 
@@ -64,67 +65,27 @@ namespace UIMessageQueue
 		enum class Entry
 		{
 			kOriginal,
-			kJmpAbs,  // FF 25 00000000 <abs64>
-			kJmpRel,  // E9 <rel32>
+			kJump,  // a jmp rel32 or a jmp [rip] from another plugin
 			kUnknown
 		};
 
+		// Every case needs the pool-count instruction. It lies past the bytes that an entry jump replaces.
 		Entry Classify(const Target& a_t)
 		{
 			const auto entry = a_t.id.address();
+			if (Bytes(entry + a_t.markerAt, a_t.marker.size()) != a_t.marker) {
+				return Entry::kUnknown;
+			}
 			if (Bytes(entry, a_t.prologue.size()) == a_t.prologue) {
-				const bool marked = Bytes(entry + a_t.markerAt, a_t.marker.size()) == a_t.marker;
-				return marked ? Entry::kOriginal : Entry::kUnknown;
+				return Entry::kOriginal;
 			}
-			if (IsAbsJump(entry)) {
-				return Entry::kJmpAbs;
-			}
-			return *reinterpret_cast<const std::uint8_t*>(entry) == 0xE9 ? Entry::kJmpRel : Entry::kUnknown;
+			const bool jump = *reinterpret_cast<const std::uint8_t*>(entry) == 0xE9 || IsAbsJump(entry);
+			return jump ? Entry::kJump : Entry::kUnknown;
 		}
 
 		std::string_view Describe(Entry a_e)
 		{
-			return a_e == Entry::kOriginal ? "original code"sv : "chained to the detour already at its entry"sv;
-		}
-
-		// Routes the entry to a_hook and sets a_next to what a_hook must call. Sets a_next before it changes the entry.
-		template <class F>
-		void Detour(const Target& a_t, Entry a_e, F a_hook, F& a_next)
-		{
-			auto&      trampoline = SKSE::GetTrampoline();
-			const auto entry = a_t.id.address();
-			const auto hook = reinterpret_cast<std::uintptr_t>(a_hook);
-			switch (a_e) {
-			case Entry::kOriginal:
-				{
-					const auto size = a_t.prologue.size();
-					auto*      stub = static_cast<std::uint8_t*>(trampoline.allocate(size + kAbsJumpSize));
-					WriteOriginal(stub, a_t.prologue, entry);
-					a_next = reinterpret_cast<F>(stub);
-					const auto patch = EntryPatch(size, hook);
-					REL::safe_write(entry, patch.data(), patch.size());
-					break;
-				}
-			case Entry::kJmpAbs:
-				{
-					a_next = reinterpret_cast<F>(AbsJumpTarget(entry));
-					REL::safe_write(entry + sizeof(kAbsJumpOp), &hook, sizeof(hook));
-					break;
-				}
-			case Entry::kJmpRel:
-				{
-					a_next = reinterpret_cast<F>(Rel32Target(entry));
-					// within 2 GB of the exe
-					auto* stub = static_cast<std::uint8_t*>(trampoline.allocate(kAbsJumpSize));
-					AbsJump(stub, hook);
-					const auto rel = static_cast<std::int32_t>(
-						reinterpret_cast<std::intptr_t>(stub) - static_cast<std::intptr_t>(entry + 5));
-					REL::safe_write(entry + 1, &rel, sizeof(rel));
-					break;
-				}
-			default:
-				break;
-			}
+			return a_e == Entry::kOriginal ? "original code"sv : "chained to another plugin's jump at its entry"sv;
 		}
 	}
 
@@ -137,8 +98,13 @@ namespace UIMessageQueue
 										   add == Entry::kUnknown ? kAdd.name : kProcess.name) };
 		}
 
-		Detour(kAdd, add, &AddMessageThunk, g_addMessage);
-		Detour(kProcess, process, &ProcessCommandsThunk, g_processCommands);
+		if (const auto why = HookEntry(g_addHook, kAdd.id.address(), &AddMessageThunk, g_addMessage); !why.empty()) {
+			return { Outcome::kFailed, std::format("{}: {}, nothing patched", kAdd.name, why) };
+		}
+		if (const auto why = HookEntry(g_processHook, kProcess.id.address(), &ProcessCommandsThunk, g_processCommands);
+			!why.empty()) {
+			return { Outcome::kFailed, std::format("{}: {}; only {} runs under the lock", kProcess.name, why, kAdd.name) };
+		}
 		return { Outcome::kActive, std::format("{} ({}) and {} ({}) both run under one lock", kAdd.name, Describe(add),
 									   kProcess.name, Describe(process)) };
 	}
@@ -147,6 +113,5 @@ namespace UIMessageQueue
 		.key = "UIMessageQueue",
 		.oldDll = "UIMessageQueueRaceFix.dll",
 		.install = Install,
-		.trampoline = kAdd.prologue.size() + kProcess.prologue.size() + 2 * kAbsJumpSize,
 	});
 }

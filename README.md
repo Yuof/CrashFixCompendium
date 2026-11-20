@@ -62,4 +62,5 @@ the code helpers, and the checks of the source.
 
 ## License
 [GPL-3.0-or-later](LICENSE), as required by [CommonLibSSE NG](https://github.com/alandtse/CommonLibVR) (GPL-3.0-or-later
-with its modding exceptions), which this plugin links statically.
+with its modding exceptions), which this plugin links statically. It also links [SafetyHook](https://github.com/cursey/safetyhook)
+(BSL-1.0) and its disassembler [Zydis](https://github.com/zyantific/zydis) (MIT) for the hooks on function entries.

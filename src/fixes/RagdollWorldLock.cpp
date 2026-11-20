@@ -14,6 +14,7 @@
 // it the same update again at once. Install checks both functions' first bytes and finds the runner's call to each.
 
 #include "fix.h"
+#include "hook.h"
 
 #include <intrin.h>
 
@@ -27,8 +28,8 @@ namespace RagdollWorldLock
 		constexpr REL::RelocationID kRunQueue{ 61313, 62204 };         // hkpWorldOperationQueue: runs the pending operations
 		constexpr std::size_t       kRunQueueSpan = 0x8B0;             // to the next function on SE, 1.6.1170 and 1.7.104
 
-		// position-independent prologues, copied into the stubs: mov [rsp+18h],rbx / push rdi / sub rsp,40h /
-		// mov rbx,[rcx+10h], and push rbp / push rbx / push rsi / lea rbp,[rsp-47h] / sub rsp,90h
+		// first bytes, checked before patching: mov [rsp+18h],rbx / push rdi / sub rsp,40h / mov rbx,[rcx+10h], and
+		// push rbp / push rbx / push rsi / lea rbp,[rsp-47h] / sub rsp,90h
 		constexpr auto kUpdateAfterMoveHead = "\x48\x89\x5C\x24\x18\x57\x48\x83\xEC\x40\x48\x8B\x59\x10"sv;
 		constexpr auto kPhantomUpdateHead = "\x40\x55\x53\x56\x48\x8D\x6C\x24\xB9\x48\x81\xEC\x90\x00\x00\x00"sv;
 
@@ -58,7 +59,7 @@ namespace RagdollWorldLock
 		using UpdateAfterMove_t = void (*)(RE::hkpEntity*);
 		using PhantomUpdate_t = void (*)(RE::hkpPhantom*, const RE::hkAabb*);
 		using QueueOperation_t = void (*)(RE::hkpWorld*, const Operation*);
-		UpdateAfterMove_t          g_updateAfterMove = nullptr;  // the originals, through the stubs
+		UpdateAfterMove_t          g_updateAfterMove = nullptr;  // the original functions, through the trampolines
 		PhantomUpdate_t            g_phantomUpdate = nullptr;
 		std::uintptr_t             g_fromRunQueue[2]{};          // the queue runner's return addresses into them
 		std::atomic<std::uint64_t> g_locked{ 0 };
@@ -118,15 +119,8 @@ namespace RagdollWorldLock
 			WithWorldLock(a_phantom->world, op, fromRunQueue, [&] { g_phantomUpdate(a_phantom, a_aabb); });
 		}
 
-		template <class F>
-		F Detour(std::uintptr_t a_entry, std::string_view a_head, F a_hook)
-		{
-			auto* stub = static_cast<std::uint8_t*>(SKSE::GetTrampoline().allocate(a_head.size() + kAbsJumpSize));
-			WriteOriginal(stub, a_head, a_entry);
-			const auto patch = EntryPatch(a_head.size(), reinterpret_cast<std::uintptr_t>(a_hook));
-			REL::safe_write(a_entry, patch.data(), patch.size());
-			return reinterpret_cast<F>(stub);
-		}
+		SafetyHookInline g_updateAfterMoveHook;
+		SafetyHookInline g_phantomUpdateHook;
 	}
 
 	Result Install()
@@ -146,14 +140,20 @@ namespace RagdollWorldLock
 		}
 		g_fromRunQueue[0] = bodyCall.site + 5;
 		g_fromRunQueue[1] = phantomCall.site + 5;
-		g_updateAfterMove = Detour(updateAfterMove, kUpdateAfterMoveHead, &UpdateAfterMoveThunk);
-		g_phantomUpdate = Detour(phantomUpdate, kPhantomUpdateHead, &PhantomUpdateThunk);
+		if (const auto why = HookEntry(g_updateAfterMoveHook, updateAfterMove, &UpdateAfterMoveThunk, g_updateAfterMove);
+			!why.empty()) {
+			return { Outcome::kFailed, std::format("updateBroadPhaseAfterMove: {}, nothing patched"sv, why) };
+		}
+		if (const auto why = HookEntry(g_phantomUpdateHook, phantomUpdate, &PhantomUpdateThunk, g_phantomUpdate);
+			!why.empty()) {
+			return { Outcome::kFailed,
+				std::format("the phantom's updateBroadPhase: {}; only the entity's update takes the lock"sv, why) };
+		}
 		return { Outcome::kActive, "the two broadphase updates take the physics world lock, or queue while it is held" };
 	}
 
 	const bool kRegistered = Register({
 		.key = "RagdollWorldLock",
 		.install = Install,
-		.trampoline = 2 * (kAbsJumpSize + 16),  // two stubs: a prologue of up to 16 bytes and a jump back
 	});
 }

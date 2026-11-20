@@ -20,7 +20,7 @@ Two threads that read the same counter value pick the same message. Both write a
 `ProcessCommands`, which hands all 64 messages back by setting the counter to 0, takes no lock either.
 
 ## The code, with the fix in
-The fix detours the entry of both functions. Each now runs through a function of mine that takes a lock first.
+The fix detours the entry of both functions with a 5-byte jump. Each now runs through a function of mine that takes a lock first.
 
 My functions (`src/fixes/UIMessageQueue.cpp`):
 
@@ -41,7 +41,7 @@ void ProcessCommandsThunk(RE::UIMessageQueue* a_queue)
 }
 ```
 
-The game's two functions, unchanged except that nobody can reach them without the lock any more (decompiled):
+The game's two functions, unchanged except that a call now takes the lock first (decompiled):
 
 ```c
 // SkyrimSE+1AF260 (Address Library 13631)

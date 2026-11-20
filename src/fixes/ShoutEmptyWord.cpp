@@ -6,11 +6,14 @@
 // (some dragon shouts).
 
 #include "fix.h"
+#include "hook.h"
 
 namespace ShoutEmptyWord
 {
 	namespace
 	{
+		SafetyHookInline g_hook;
+
 		constexpr REL::RelocationID kLastKnownWord{ 22900, 23357 };
 
 		// identical on SE and AE, up to the end of the loop
@@ -42,9 +45,9 @@ namespace ShoutEmptyWord
 			return { Outcome::kFailed, "the shout word helper is not the expected code, nothing patched" };
 		}
 
-		// 16 bytes = whole instructions
-		const auto patch = EntryPatch(16, reinterpret_cast<std::uintptr_t>(&LastKnownWord));
-		REL::safe_write(target, patch.data(), patch.size());
+		if (const auto why = HookEntry(g_hook, target, &LastKnownWord); !why.empty()) {
+			return { Outcome::kFailed, std::format("the shout word helper: {}, nothing patched"sv, why) };
+		}
 		return { Outcome::kActive, "replaced the shout word helper: its answer ends at a shout's last word" };
 	}
 

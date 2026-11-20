@@ -6,6 +6,7 @@
 // the function's first bytes); any other build stays untouched.
 
 #include "fix.h"
+#include "hook.h"
 
 namespace DisabledAttacker
 {
@@ -14,8 +15,7 @@ namespace DisabledAttacker
 		constexpr std::uint32_t  kTimestamp = 0x6A967CB2;  // Precision.dll 2.0.6 (Nexus 72347)
 		constexpr std::uintptr_t kRun = 0x5CA50;           // PendingHit::Run (Precision.pdb)
 
-		// mov rax,rsp / mov [rax+10h],rbx / mov [rax+18h],rsi / mov [rax+20h],rdi: position-independent, so the
-		// stub can run them
+		// mov rax,rsp / mov [rax+10h],rbx / mov [rax+18h],rsi / mov [rax+20h],rdi
 		constexpr auto kPrologue = "\x48\x8B\xC4\x48\x89\x58\x10\x48\x89\x70\x18\x48\x89\x78\x20"sv;
 
 		struct PendingHit
@@ -24,7 +24,8 @@ namespace DisabledAttacker
 		};
 
 		using Run_t = void (*)(PendingHit*);
-		Run_t g_run = nullptr;  // the original, through the stub
+		Run_t            g_run = nullptr;  // Precision's original function, through the trampoline
+		SafetyHookInline g_hook;
 
 		std::atomic<std::uint64_t> g_skipped{ 0 };
 
@@ -63,23 +64,9 @@ namespace DisabledAttacker
 			return { Outcome::kFailed, "PendingHit::Run's first bytes differ, nothing patched" };
 		}
 
-		// SKSE's trampoline sits near SkyrimSE.exe, out of rel32 reach of Precision.dll: absolute jumps both ways
-		const auto stubSize = kPrologue.size() + kAbsJumpSize;
-		auto*      stub =
-			static_cast<std::uint8_t*>(VirtualAlloc(nullptr, stubSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
-		if (!stub) {
-			return { Outcome::kFailed, "no memory for the stub, nothing patched" };
+		if (const auto why = HookEntry(g_hook, target, &RunThunk, g_run); !why.empty()) {
+			return { Outcome::kFailed, std::format("PendingHit::Run: {}, nothing patched"sv, why) };
 		}
-		WriteOriginal(stub, kPrologue, target);
-
-		DWORD oldProtect = 0;
-		if (!VirtualProtect(stub, stubSize, PAGE_EXECUTE_READ, &oldProtect)) {
-			return { Outcome::kFailed, "could not make the stub executable, nothing patched" };
-		}
-		g_run = reinterpret_cast<Run_t>(stub);
-
-		const auto patch = EntryPatch(kPrologue.size(), reinterpret_cast<std::uintptr_t>(&RunThunk));
-		REL::safe_write(target, patch.data(), patch.size());
 		return { Outcome::kActive, "wrapped Precision 2.0.6 PendingHit::Run" };
 	}
 
