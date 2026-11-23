@@ -32,6 +32,10 @@ namespace RagdollWorldLock
 		// push rbp / push rbx / push rsi / lea rbp,[rsp-47h] / sub rsp,90h
 		constexpr auto kUpdateAfterMoveHead = "\x48\x89\x5C\x24\x18\x57\x48\x83\xEC\x40\x48\x8B\x59\x10"sv;
 		constexpr auto kPhantomUpdateHead = "\x40\x55\x53\x56\x48\x8D\x6C\x24\xB9\x48\x81\xEC\x90\x00\x00\x00"sv;
+		// the instructions the entry jumps replace: mov [rsp+18h],rbx, and push rbp / push rbx / push rsi /
+		// lea rbp,[rsp-47h]
+		constexpr auto kUpdateAfterMoveJumped = kUpdateAfterMoveHead.substr(0, 5);
+		constexpr auto kPhantomUpdateJumped = kPhantomUpdateHead.substr(0, 9);
 
 		constexpr std::uint8_t  kOpUpdateAfterMove = 0x17;
 		constexpr std::uint8_t  kOpPhantomUpdate = 0x12;
@@ -59,7 +63,7 @@ namespace RagdollWorldLock
 		using UpdateAfterMove_t = void (*)(RE::hkpEntity*);
 		using PhantomUpdate_t = void (*)(RE::hkpPhantom*, const RE::hkAabb*);
 		using QueueOperation_t = void (*)(RE::hkpWorld*, const Operation*);
-		UpdateAfterMove_t          g_updateAfterMove = nullptr;  // the original functions, through the trampolines
+		UpdateAfterMove_t          g_updateAfterMove = nullptr;  // the original functions, through the stubs
 		PhantomUpdate_t            g_phantomUpdate = nullptr;
 		std::uintptr_t             g_fromRunQueue[2]{};          // the queue runner's return addresses into them
 		std::atomic<std::uint64_t> g_locked{ 0 };
@@ -118,9 +122,6 @@ namespace RagdollWorldLock
 			const bool fromRunQueue = reinterpret_cast<std::uintptr_t>(_ReturnAddress()) == g_fromRunQueue[1];
 			WithWorldLock(a_phantom->world, op, fromRunQueue, [&] { g_phantomUpdate(a_phantom, a_aabb); });
 		}
-
-		SafetyHookInline g_updateAfterMoveHook;
-		SafetyHookInline g_phantomUpdateHook;
 	}
 
 	Result Install()
@@ -140,11 +141,12 @@ namespace RagdollWorldLock
 		}
 		g_fromRunQueue[0] = bodyCall.site + 5;
 		g_fromRunQueue[1] = phantomCall.site + 5;
-		if (const auto why = HookEntry(g_updateAfterMoveHook, updateAfterMove, &UpdateAfterMoveThunk, g_updateAfterMove);
+		if (const auto why =
+				HookEntry(updateAfterMove, kUpdateAfterMoveJumped, &UpdateAfterMoveThunk, g_updateAfterMove);
 			!why.empty()) {
 			return { Outcome::kFailed, std::format("updateBroadPhaseAfterMove: {}, nothing patched"sv, why) };
 		}
-		if (const auto why = HookEntry(g_phantomUpdateHook, phantomUpdate, &PhantomUpdateThunk, g_phantomUpdate);
+		if (const auto why = HookEntry(phantomUpdate, kPhantomUpdateJumped, &PhantomUpdateThunk, g_phantomUpdate);
 			!why.empty()) {
 			return { Outcome::kFailed,
 				std::format("the phantom's updateBroadPhase: {}; only the entity's update takes the lock"sv, why) };
@@ -155,5 +157,6 @@ namespace RagdollWorldLock
 	const bool kRegistered = Register({
 		.key = "RagdollWorldLock",
 		.install = Install,
+		.trampoline = HookSize(kUpdateAfterMoveJumped) + HookSize(kPhantomUpdateJumped),
 	});
 }

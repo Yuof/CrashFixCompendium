@@ -44,8 +44,9 @@ namespace UIMessageQueue
 		using ProcessCommands_t = void (*)(RE::UIMessageQueue*);
 		AddMessage_t      g_addMessage = nullptr;
 		ProcessCommands_t g_processCommands = nullptr;
-		SafetyHookInline  g_addHook;
-		SafetyHookInline  g_processHook;
+
+		// the entry jump replaces push rsi / push rdi / push r14 and mov [rsp+10h],rbx: 5 bytes in both
+		constexpr std::size_t kJumped = 5;
 
 		std::recursive_mutex g_lock;
 
@@ -87,6 +88,19 @@ namespace UIMessageQueue
 		{
 			return a_e == Entry::kOriginal ? "original code"sv : "chained to another plugin's jump at its entry"sv;
 		}
+
+		// Original code: the replaced instructions run in a stub. Another plugin's jump: its target becomes a_original,
+		// so that plugin's code runs inside the lock.
+		template <class F>
+		std::string Hook(const Target& a_t, Entry a_e, F a_detour, F& a_original)
+		{
+			const auto entry = a_t.id.address();
+			if (a_e == Entry::kOriginal) {
+				return HookEntry(entry, a_t.prologue.substr(0, kJumped), a_detour, a_original);
+			}
+			a_original = reinterpret_cast<F>(IsAbsJump(entry) ? AbsJumpTarget(entry) : Rel32Target(entry));
+			return JumpToDetour(entry, kJumped, reinterpret_cast<std::uintptr_t>(a_detour));
+		}
 	}
 
 	Result Install()
@@ -98,11 +112,10 @@ namespace UIMessageQueue
 										   add == Entry::kUnknown ? kAdd.name : kProcess.name) };
 		}
 
-		if (const auto why = HookEntry(g_addHook, kAdd.id.address(), &AddMessageThunk, g_addMessage); !why.empty()) {
+		if (const auto why = Hook(kAdd, add, &AddMessageThunk, g_addMessage); !why.empty()) {
 			return { Outcome::kFailed, std::format("{}: {}, nothing patched", kAdd.name, why) };
 		}
-		if (const auto why = HookEntry(g_processHook, kProcess.id.address(), &ProcessCommandsThunk, g_processCommands);
-			!why.empty()) {
+		if (const auto why = Hook(kProcess, process, &ProcessCommandsThunk, g_processCommands); !why.empty()) {
 			return { Outcome::kFailed, std::format("{}: {}; only {} runs under the lock", kProcess.name, why, kAdd.name) };
 		}
 		return { Outcome::kActive, std::format("{} ({}) and {} ({}) both run under one lock", kAdd.name, Describe(add),
@@ -113,5 +126,6 @@ namespace UIMessageQueue
 		.key = "UIMessageQueue",
 		.oldDll = "UIMessageQueueRaceFix.dll",
 		.install = Install,
+		.trampoline = HookSize(kAdd.prologue.substr(0, kJumped)) + HookSize(kProcess.prologue.substr(0, kJumped)),
 	});
 }

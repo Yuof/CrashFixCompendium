@@ -10,9 +10,8 @@ namespace NifStringIndex
 {
 	namespace
 	{
-		SafetyHookInline g_hook;
-
 		constexpr REL::RelocationID kReadString{ 68995, 70352 };
+		constexpr std::size_t       kJumpSize = 8;  // mov rax,rsp / push rdi / sub rsp,40h
 
 		// identical on SE and AE, up to `cmp eax, -1`
 		constexpr auto kExpected =
@@ -55,7 +54,8 @@ namespace NifStringIndex
 			return { Outcome::kFailed, "the .nif string reader is not the expected code, nothing patched" };
 		}
 
-		if (const auto why = HookEntry(g_hook, target, &ReadString); !why.empty()) {
+		if (const auto why = JumpToDetour(target, kJumpSize, reinterpret_cast<std::uintptr_t>(&ReadString));
+			!why.empty()) {
 			return { Outcome::kFailed, std::format("the .nif string reader: {}, nothing patched"sv, why) };
 		}
 		return { Outcome::kActive,
@@ -65,5 +65,6 @@ namespace NifStringIndex
 	const bool kRegistered = Register({
 		.key = "NifStringIndex",
 		.install = Install,
+		.trampoline = kReplaceSize,
 	});
 }

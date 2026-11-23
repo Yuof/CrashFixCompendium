@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.2
+- Reverted some changes.
+
 ## 1.6.1
 - UI Message Queue: no longer crashes the game before the main menu with MiniMap Menu (Nexus 149508)
   MiniMap Menu's hook resumes the game's code 5 bytes into `AddMessage`, which was the middle of this fix's 18-byte jump.

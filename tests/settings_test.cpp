@@ -306,6 +306,49 @@ namespace
 		}
 	}
 
+	void abs_jump_round_trip()
+	{
+		std::uint8_t           code[kAbsJumpSize]{};
+		constexpr std::uint8_t want[kAbsJumpSize]{ 0xFF, 0x25, 0, 0, 0, 0, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22,
+			0x11 };
+		AbsJump(code, 0x1122334455667788ull);
+		CHECK(std::memcmp(code, want, sizeof(want)) == 0);
+	}
+
+	// the jump must land where Rel32Target reads it, both ways, and NOPs fill the rest of the replaced instructions
+	void entry_jump_bytes()
+	{
+		constexpr std::uintptr_t entry = 0x7FF600001000;
+		for (const std::uintptr_t to : { entry + 0x7000'0000, entry - 0x7000'0000 }) {
+			const auto patch = EntryJump(entry, to, 8);
+			CHECK(patch.size() == 8);
+			CHECK(patch[0] == 0xE9);
+			const auto at = reinterpret_cast<std::uintptr_t>(patch.data());
+			CHECK(Rel32Target(at) - at == to - entry);
+			CHECK(patch[5] == 0x90 && patch[7] == 0x90);
+		}
+		CHECK(EntryJump(entry, entry + 5 + 0x7FFF'FFFF, 5).size() == 5);  // the farthest forward
+		CHECK(EntryJump(entry, entry + 5 + 0x8000'0000, 5).empty());
+		CHECK(EntryJump(entry, entry + 5 - 0x8000'0000, 5).size() == 5);  // the farthest back
+		CHECK(EntryJump(entry, entry + 5 - 0x8000'0001, 5).empty());
+		CHECK(EntryJump(entry, entry + 0x100, 4).empty());  // too short for a jmp rel32
+	}
+
+	void stub_and_abs_patch_bytes()
+	{
+		constexpr std::string_view head = "\x48\x8B\xC4\x53\x90";
+		std::uint8_t               stub[head.size() + kAbsJumpSize]{};
+		WriteOriginal(stub, head, 0x1000);
+		CHECK(Bytes(reinterpret_cast<std::uintptr_t>(stub), head.size()) == head);
+		CHECK(AbsJumpTarget(reinterpret_cast<std::uintptr_t>(stub + head.size())) == 0x1000 + head.size());
+
+		const auto patch = EntryPatch(16, 0x2000);
+		CHECK(patch.size() == 16);
+		CHECK(AbsJumpTarget(reinterpret_cast<std::uintptr_t>(patch.data())) == 0x2000);
+		CHECK(patch[kAbsJumpSize] == 0x90);
+		CHECK(patch[15] == 0x90);
+	}
+
 	// Windows reads "BOM + [Fixes]" as no section at all: the player's lines would be ignored while the log says active
 	void utf8_bom_on_section_line_reports_error()
 	{
@@ -475,6 +518,9 @@ int main()
 	find_call_wants_exactly_one();
 	abs_jump_detected();
 	rel32_target_goes_both_ways();
+	abs_jump_round_trip();
+	entry_jump_bytes();
+	stub_and_abs_patch_bytes();
 
 	std::error_code ec;
 	SetFileAttributesW(kCustom.c_str(), FILE_ATTRIBUTE_NORMAL);

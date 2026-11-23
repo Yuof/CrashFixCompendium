@@ -74,6 +74,45 @@ inline std::uintptr_t AbsJumpTarget(std::uintptr_t a_at)
 	return *reinterpret_cast<const volatile std::uintptr_t*>(a_at + sizeof(kAbsJumpOp));
 }
 
+inline void AbsJump(std::uint8_t* a_at, std::uintptr_t a_to)
+{
+	std::memcpy(a_at, kAbsJumpOp, sizeof(kAbsJumpOp));
+	std::memcpy(a_at + sizeof(kAbsJumpOp), &a_to, sizeof(a_to));
+}
+
+// The original function's stub: a_head (the function's first whole instructions, position-independent), then a jump
+// to the rest of the function at a_entry + a_head.size()
+inline void WriteOriginal(std::uint8_t* a_stub, std::string_view a_head, std::uintptr_t a_entry)
+{
+	std::memcpy(a_stub, a_head.data(), a_head.size());
+	AbsJump(a_stub + a_head.size(), a_entry + a_head.size());
+}
+
+// A function's new first a_size bytes: jmp rel32 to a_to, then NOPs to the end of the last instruction it covers.
+// Empty when a_size is under 5 or a_to is out of rel32 reach.
+inline std::vector<std::uint8_t> EntryJump(std::uintptr_t a_entry, std::uintptr_t a_to, std::size_t a_size)
+{
+	const auto rel = static_cast<std::int64_t>(a_to - (a_entry + 5));
+	if (a_size < 5 || rel != static_cast<std::int32_t>(rel)) {
+		return {};
+	}
+	std::vector<std::uint8_t> patch(a_size, 0x90);
+	patch[0] = 0xE9;
+	const auto rel32 = static_cast<std::int32_t>(rel);
+	std::memcpy(patch.data() + 1, &rel32, sizeof(rel32));
+	return patch;
+}
+
+// The same with a 14-byte jmp [rip] to a_to, which reaches any address. Only for code outside SkyrimSE.exe that no
+// other plugin hooks (Precision's PendingHit::Run): a plugin that later hooks the entry with a 5-byte jump and resumes
+// at entry+5 would land inside this one.
+inline std::vector<std::uint8_t> EntryPatch(std::size_t a_size, std::uintptr_t a_to)
+{
+	std::vector<std::uint8_t> patch(a_size, 0x90);
+	AbsJump(patch.data(), a_to);
+	return patch;
+}
+
 enum class Outcome
 {
 	kActive,

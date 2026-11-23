@@ -12,9 +12,8 @@ namespace ShoutEmptyWord
 {
 	namespace
 	{
-		SafetyHookInline g_hook;
-
 		constexpr REL::RelocationID kLastKnownWord{ 22900, 23357 };
+		constexpr std::size_t       kJumpSize = 5;  // mov [rsp+8],rbx
 
 		// identical on SE and AE, up to the end of the loop
 		constexpr auto kExpected =
@@ -45,7 +44,8 @@ namespace ShoutEmptyWord
 			return { Outcome::kFailed, "the shout word helper is not the expected code, nothing patched" };
 		}
 
-		if (const auto why = HookEntry(g_hook, target, &LastKnownWord); !why.empty()) {
+		if (const auto why = JumpToDetour(target, kJumpSize, reinterpret_cast<std::uintptr_t>(&LastKnownWord));
+			!why.empty()) {
 			return { Outcome::kFailed, std::format("the shout word helper: {}, nothing patched"sv, why) };
 		}
 		return { Outcome::kActive, "replaced the shout word helper: its answer ends at a shout's last word" };
@@ -54,5 +54,6 @@ namespace ShoutEmptyWord
 	const bool kRegistered = Register({
 		.key = "ShoutEmptyWord",
 		.install = Install,
+		.trampoline = kReplaceSize,
 	});
 }

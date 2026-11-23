@@ -1,6 +1,6 @@
 {
   "name": "crashfixcompendium",
-  "version-string": "1.6.1",
+  "version-string": "1.6.2",
   "description": "SKSE plugin: All-in-one SKSE crash fixes",
   "license": "GPL-3.0-or-later",
   "dependencies": [
@@ -8,7 +8,6 @@
     "directxtk",
     "fmt",
     "rapidcsv",
-    "safetyhook",
     "spdlog"
   ],
   "builtin-baseline": "ee12231b20c95013c6638d845d04c91559a1d1ff"
