@@ -142,6 +142,7 @@ SKSE_PLUGIN_LOAD(const SKSE::LoadInterface* a_skse)
 		if (a_msg->type == SKSE::MessagingInterface::kPostLoad) {
 			Run(false);
 		}
+		HookWatchMessage(a_msg->type);
 	};
 	if (!SKSE::GetMessagingInterface()->RegisterListener(onMessage)) {
 		logger::error("failed: could not listen for SKSE's messages, only the fixes that install at load are on"sv);

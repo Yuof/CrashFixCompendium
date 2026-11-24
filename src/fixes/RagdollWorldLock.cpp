@@ -141,12 +141,13 @@ namespace RagdollWorldLock
 		}
 		g_fromRunQueue[0] = bodyCall.site + 5;
 		g_fromRunQueue[1] = phantomCall.site + 5;
-		if (const auto why =
-				HookEntry(updateAfterMove, kUpdateAfterMoveJumped, &UpdateAfterMoveThunk, g_updateAfterMove);
+		if (const auto why = HookEntry("RagdollWorldLock: hkpEntity::updateBroadPhaseAfterMove"sv, updateAfterMove,
+				kUpdateAfterMoveJumped, &UpdateAfterMoveThunk, g_updateAfterMove);
 			!why.empty()) {
 			return { Outcome::kFailed, std::format("updateBroadPhaseAfterMove: {}, nothing patched"sv, why) };
 		}
-		if (const auto why = HookEntry(phantomUpdate, kPhantomUpdateJumped, &PhantomUpdateThunk, g_phantomUpdate);
+		if (const auto why = HookEntry("RagdollWorldLock: hkpPhantom::updateBroadPhase"sv, phantomUpdate,
+				kPhantomUpdateJumped, &PhantomUpdateThunk, g_phantomUpdate);
 			!why.empty()) {
 			return { Outcome::kFailed,
 				std::format("the phantom's updateBroadPhase: {}; only the entity's update takes the lock"sv, why) };

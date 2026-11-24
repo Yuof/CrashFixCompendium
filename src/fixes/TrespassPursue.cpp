@@ -98,6 +98,7 @@ namespace TrespassPursue
 		for (std::size_t i = 0; i < std::size(kCallers); ++i) {
 			if (sites[i]) {
 				g_target[i] = reinterpret_cast<BuildTree_t>(SKSE::GetTrampoline().write_call<5>(sites[i], kThunks[i]));
+				WatchSite(std::format("TrespassPursue: the tree builder's call in the {}", kCallers[i].name), sites[i]);
 				patched += std::format("{}{} (+0x{:X})", patched.empty() ? "" : ", ", kCallers[i].name,
 					sites[i] - kCallers[i].id.address());
 			}

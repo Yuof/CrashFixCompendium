@@ -148,3 +148,10 @@ inline bool Register(const Fix& a_fix)
 	AllFixes().push_back(a_fix);
 	return true;
 }
+
+// HookWatch.cpp
+std::string Owner(std::uintptr_t a_address);   // "<module>+<offset>", or the bare address outside every module
+std::string JumpChain(std::uintptr_t a_site);  // the jumps from a_site to the code they reach, each as Owner()
+// Call right after writing a jump or call at a_site: HookWatch logs what it leads to now and every later change.
+void WatchSite(std::string_view a_name, std::uintptr_t a_site);
+void HookWatchMessage(std::uint32_t a_type);  // every SKSE message, for the start-up timeline

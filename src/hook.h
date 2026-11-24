@@ -12,8 +12,10 @@
 // a_size: the end of the last instruction the jump covers. Its bytes after the jump become NOPs.
 // Trampoline use per hook: kAbsJumpSize, plus a_head.size() + kAbsJumpSize for HookEntry. The fix's .trampoline
 // counts them.
+// a_name: the function, for HookWatch's lines.
 // Returns an empty string, or the reason that nothing was patched.
-inline std::string JumpToDetour(std::uintptr_t a_entry, std::size_t a_size, std::uintptr_t a_detour)
+inline std::string JumpToDetour(std::string_view a_name, std::uintptr_t a_entry, std::size_t a_size,
+	std::uintptr_t a_detour)
 {
 	auto* slot = static_cast<std::uint8_t*>(SKSE::GetTrampoline().allocate(kAbsJumpSize));
 	AbsJump(slot, a_detour);
@@ -22,6 +24,7 @@ inline std::string JumpToDetour(std::uintptr_t a_entry, std::size_t a_size, std:
 		return "SKSE's trampoline is out of jump range";
 	}
 	REL::safe_write(a_entry, patch.data(), patch.size());
+	WatchSite(a_name, a_entry);
 	return {};
 }
 
@@ -29,12 +32,13 @@ inline std::string JumpToDetour(std::uintptr_t a_entry, std::size_t a_size, std:
 // none of them rip-relative; the caller has checked that they are the game's bytes. They run in a stub that then
 // jumps to entry + a_head.size(). a_original is set before the entry changes.
 template <class F>
-std::string HookEntry(std::uintptr_t a_entry, std::string_view a_head, F a_detour, F& a_original)
+std::string HookEntry(std::string_view a_name, std::uintptr_t a_entry, std::string_view a_head, F a_detour,
+	F& a_original)
 {
 	auto* stub = static_cast<std::uint8_t*>(SKSE::GetTrampoline().allocate(a_head.size() + kAbsJumpSize));
 	WriteOriginal(stub, a_head, a_entry);
 	a_original = reinterpret_cast<F>(stub);
-	return JumpToDetour(a_entry, a_head.size(), reinterpret_cast<std::uintptr_t>(a_detour));
+	return JumpToDetour(a_name, a_entry, a_head.size(), reinterpret_cast<std::uintptr_t>(a_detour));
 }
 
 constexpr std::size_t kReplaceSize = kAbsJumpSize;  // trampoline bytes for JumpToDetour

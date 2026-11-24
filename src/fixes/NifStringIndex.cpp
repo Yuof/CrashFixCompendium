@@ -54,7 +54,8 @@ namespace NifStringIndex
 			return { Outcome::kFailed, "the .nif string reader is not the expected code, nothing patched" };
 		}
 
-		if (const auto why = JumpToDetour(target, kJumpSize, reinterpret_cast<std::uintptr_t>(&ReadString));
+		if (const auto why = JumpToDetour("NifStringIndex: the .nif string reader"sv, target, kJumpSize,
+				reinterpret_cast<std::uintptr_t>(&ReadString));
 			!why.empty()) {
 			return { Outcome::kFailed, std::format("the .nif string reader: {}, nothing patched"sv, why) };
 		}

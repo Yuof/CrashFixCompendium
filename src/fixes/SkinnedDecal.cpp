@@ -48,6 +48,7 @@ namespace SkinnedDecal
 		}
 
 		g_target = reinterpret_cast<Target_t>(SKSE::GetTrampoline().write_call<5>(call.site, TargetThunk));
+		WatchSite("SkinnedDecal: ApplyDecal's call of the attach-node walk"sv, call.site);
 		return { Outcome::kActive,
 			std::format("patched ApplyDecal's call of the attach-node walk (+0x{:X}): "
 						"skinned decal nodes are created under one lock",

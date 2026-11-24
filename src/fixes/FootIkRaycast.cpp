@@ -68,6 +68,7 @@ namespace FootIkRaycast
 		}
 
 		g_resize = reinterpret_cast<Resize_t>(SKSE::GetTrampoline().write_call<5>(call.site, ResizeThunk));
+		WatchSite("FootIkRaycast: the table's resize call"sv, call.site);
 		return { Outcome::kActive,
 			std::format("patched the foot-IK raycast table's resize(50) (+0x{:X}): room for {} entries",
 				call.site - start, kReserve) };

@@ -56,6 +56,12 @@ target_include_directories(audio_header_test PRIVATE src)
 target_compile_options(audio_header_test PRIVATE /utf-8)
 add_test(NAME audio_header COMMAND audio_header_test)
 
+add_executable(jumps_test tests/jumps_test.cpp)
+target_compile_features(jumps_test PRIVATE cxx_std_20)
+target_include_directories(jumps_test PRIVATE src)
+target_compile_options(jumps_test PRIVATE /utf-8)
+add_test(NAME jumps COMMAND jumps_test)
+
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
 	add_test(NAME source COMMAND Python3::Interpreter "${PROJECT_SOURCE_DIR}/Tools/check_source.py")

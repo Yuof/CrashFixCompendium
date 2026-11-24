@@ -9,6 +9,8 @@
 #include "fix.h"
 #include "hook.h"
 
+#include <thread>
+
 namespace UIMessageQueue
 {
 	namespace
@@ -50,16 +52,45 @@ namespace UIMessageQueue
 
 		std::recursive_mutex g_lock;
 
+		// For HookWatch: which thread holds the lock, since when, and how many threads wait for it
+		std::atomic<std::uint32_t> g_holder{ 0 };
+		std::atomic<std::uint64_t> g_heldSince{ 0 };
+		std::atomic<int>           g_waiting{ 0 };
+		thread_local int           t_depth = 0;
+
+		struct Held
+		{
+			Held()
+			{
+				++g_waiting;
+				g_lock.lock();
+				--g_waiting;
+				if (t_depth++ == 0) {
+					g_heldSince = GetTickCount64();
+					g_holder = GetCurrentThreadId();
+				}
+			}
+			~Held()
+			{
+				if (--t_depth == 0) {
+					g_holder = 0;
+				}
+				g_lock.unlock();
+			}
+			Held(const Held&) = delete;
+			Held& operator=(const Held&) = delete;
+		};
+
 		void AddMessageThunk(RE::UIMessageQueue* a_queue, const RE::BSFixedString& a_menu, RE::UI_MESSAGE_TYPE a_type,
 			RE::IUIMessageData* a_data)
 		{
-			const std::scoped_lock lock{ g_lock };
+			const Held lock;
 			g_addMessage(a_queue, a_menu, a_type, a_data);
 		}
 
 		void ProcessCommandsThunk(RE::UIMessageQueue* a_queue)
 		{
-			const std::scoped_lock lock{ g_lock };
+			const Held lock;
 			g_processCommands(a_queue);
 		}
 
@@ -84,9 +115,12 @@ namespace UIMessageQueue
 			return jump ? Entry::kJump : Entry::kUnknown;
 		}
 
-		std::string_view Describe(Entry a_e)
+		// Read before the entry is hooked: a chained jump is named by the code it leads to
+		std::string Describe(const Target& a_t, Entry a_e)
 		{
-			return a_e == Entry::kOriginal ? "original code"sv : "chained to another plugin's jump at its entry"sv;
+			return a_e == Entry::kOriginal ?
+			           "original code"s :
+			           "chained to another plugin's jump at its entry: " + JumpChain(a_t.id.address());
 		}
 
 		// Original code: the replaced instructions run in a stub. Another plugin's jump: its target becomes a_original,
@@ -96,12 +130,31 @@ namespace UIMessageQueue
 		{
 			const auto entry = a_t.id.address();
 			if (a_e == Entry::kOriginal) {
-				return HookEntry(entry, a_t.prologue.substr(0, kJumped), a_detour, a_original);
+				return HookEntry(a_t.name, entry, a_t.prologue.substr(0, kJumped), a_detour, a_original);
 			}
 			a_original = reinterpret_cast<F>(IsAbsJump(entry) ? AbsJumpTarget(entry) : Rel32Target(entry));
-			return JumpToDetour(entry, kJumped, reinterpret_cast<std::uintptr_t>(a_detour));
+			return JumpToDetour(a_t.name, entry, kJumped, reinterpret_cast<std::uintptr_t>(a_detour));
 		}
 	}
+
+	bool LockHeld(std::uint32_t& a_thread, std::uint64_t& a_since, int& a_waiting)
+	{
+		a_thread = g_holder;
+		a_since = g_heldSince;
+		a_waiting = g_waiting;
+		return a_thread != 0;
+	}
+
+#ifdef HOOKWATCH_FORCE
+	// Test build only: a thread holds the lock for a_ms, as a hook that waits inside it would
+	void ForceHold(std::uint32_t a_ms)
+	{
+		std::thread([a_ms] {
+			const Held lock;
+			Sleep(a_ms);
+		}).detach();
+	}
+#endif
 
 	Result Install()
 	{
@@ -111,6 +164,8 @@ namespace UIMessageQueue
 			return { Outcome::kFailed, std::format("{}: unexpected code at its entry, nothing patched",
 										   add == Entry::kUnknown ? kAdd.name : kProcess.name) };
 		}
+		const auto addText = Describe(kAdd, add);
+		const auto processText = Describe(kProcess, process);
 
 		if (const auto why = Hook(kAdd, add, &AddMessageThunk, g_addMessage); !why.empty()) {
 			return { Outcome::kFailed, std::format("{}: {}, nothing patched", kAdd.name, why) };
@@ -118,8 +173,8 @@ namespace UIMessageQueue
 		if (const auto why = Hook(kProcess, process, &ProcessCommandsThunk, g_processCommands); !why.empty()) {
 			return { Outcome::kFailed, std::format("{}: {}; only {} runs under the lock", kProcess.name, why, kAdd.name) };
 		}
-		return { Outcome::kActive, std::format("{} ({}) and {} ({}) both run under one lock", kAdd.name, Describe(add),
-									   kProcess.name, Describe(process)) };
+		return { Outcome::kActive, std::format("{} ({}) and {} ({}) both run under one lock", kAdd.name, addText,
+									   kProcess.name, processText) };
 	}
 
 	const bool kRegistered = Register({

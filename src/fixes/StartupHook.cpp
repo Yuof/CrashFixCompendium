@@ -34,21 +34,6 @@ namespace StartupHook
 			return IsAbsJump(a_address) && Executable(AbsJumpTarget(a_address), 0);
 		}
 
-		// "<module>+<offset>" of the hook's target: names the plugin that wrote the hook late
-		std::string Owner(std::uintptr_t a_target)
-		{
-			HMODULE module = nullptr;
-			wchar_t path[MAX_PATH]{};
-			if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-										GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-					reinterpret_cast<LPCWSTR>(a_target), &module) ||
-				!GetModuleFileNameW(module, path, MAX_PATH)) {
-				return std::format("{:X}", a_target);
-			}
-			return std::format("{}+{:X}", std::filesystem::path(path).filename().string(),
-				a_target - reinterpret_cast<std::uintptr_t>(module));
-		}
-
 		LONG CALLBACK Handler(EXCEPTION_POINTERS* a_info)
 		{
 			const auto* record = a_info->ExceptionRecord;

@@ -44,7 +44,8 @@ namespace ShoutEmptyWord
 			return { Outcome::kFailed, "the shout word helper is not the expected code, nothing patched" };
 		}
 
-		if (const auto why = JumpToDetour(target, kJumpSize, reinterpret_cast<std::uintptr_t>(&LastKnownWord));
+		if (const auto why = JumpToDetour("ShoutEmptyWord: the shout word helper"sv, target, kJumpSize,
+				reinterpret_cast<std::uintptr_t>(&LastKnownWord));
 			!why.empty()) {
 			return { Outcome::kFailed, std::format("the shout word helper: {}, nothing patched"sv, why) };
 		}

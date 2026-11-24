@@ -119,6 +119,7 @@ namespace ShadowMapStackAlign
 		auto*      mem = trampoline.allocate(stub.size());
 		std::memcpy(mem, stub.data(), stub.size());
 		trampoline.write_branch<5>(site, reinterpret_cast<std::uintptr_t>(mem));
+		WatchSite("ShadowMapStackAlign: Engine Fixes' ShadowMap jump"sv, site);
 		return { Outcome::kActive,
 			std::format("Engine Fixes' ShadowMap detour at {:X} now called with an aligned stack", detour) };
 	}

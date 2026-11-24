@@ -26,6 +26,11 @@ DLL, each with its own on/off switch. VR is not supported.
 loose and in uncompressed .bsa archives, that the game won't play, so the file behind an `AudioFormat` line can be
 found.
 
+`HookWatch` (this diagnostic build only, `[Reports]`, on) is not a fix either, for a game that stops before the main
+menu: it logs every jump or call this DLL writes into the game's code with where it leads, and each later change to it
+(another plugin hooking the same place, by its module, or jumps that loop back), UIMessageQueue's lock held for 5 s or
+more, SKSE's messages, and a line every 30 s until the main menu.
+
 Each fix's own comment in `src/fixes/<Key>.cpp` explains the bug and the patch. How to reproduce each crash, its
 cause in the game's code and why the fix is what it is: [docs/](docs/README.md). What changed in each version:
 [CHANGELOG.md](CHANGELOG.md).
