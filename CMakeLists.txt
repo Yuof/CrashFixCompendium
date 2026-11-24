@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(
 	CrashFixCompendium
-	VERSION 1.6.2
+	VERSION 1.7.0
 	LANGUAGES CXX
 )
 

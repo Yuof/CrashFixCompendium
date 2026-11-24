@@ -21,6 +21,7 @@ DLL, each with its own on/off switch. VR is not supported.
 | `AudioFormat` | A sound file the game can't read (32-bit float, ADPCM, an .mp3 renamed) or whose header says 0 channels: XAudio2 gets a voice with 0 channels (`XAudio2_7.dll+25181`) |
 | `RagdollWorldLock` | The game switches an NPC's ragdoll joint on or off before that joint is in the physics world (`SkyrimSE.exe+0B6AA54`). Most likely cause: two game functions change the physics world's counter of changes in progress without taking its lock |
 | `SkseStackLookup` | A save while a script holds a ModEvent, UICallback or SpawnerTask handle (`skse64_1_6_1170.dll+5D51F` in SKSE 2.2.8, `rax = 0x80000003`). SKSE's check of that script's stack reads two pointers laid out as in Skyrim LE: the read faults, or it returns an arbitrary value and the handle is dropped |
+| `PathFollowerRace` | A crash during fast travel or while far-away NPCs move (`SkyrimSE.exe+11BCBB0`). One thread clears an NPC's path while another thread moves the NPC along it, because the path follower's update reads the path without its lock |
 
 `AudioFormatScan` (off by default, in the INIs' `[Reports]` section) is not a fix: it lists every sound file in Data,
 loose and in uncompressed .bsa archives, that the game won't play, so the file behind an `AudioFormat` line can be

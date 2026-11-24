@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0
+- New fix: Path Follower Race (switch `PathFollowerRace`, on by default). A crash at `SkyrimSE.exe+11BCBB0`
+  (1.6.1170) during a fast travel, with `mov r8d, [rcx+0x80]` and RCX = 0. One thread cleared a far-away actor's
+  path while another thread moved the actor along it. The game's 1.7.104 build fixes this itself: the path follower's
+  update takes the lock that the path's writers take. This fix does the same on the builds before 1.7.104, and also adds
+  flying actors.
+
 ## 1.6.2
 - Reverted some changes.
 

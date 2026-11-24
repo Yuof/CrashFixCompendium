@@ -14,6 +14,7 @@ The helpers they use:
 | `g.tool("inspect", kind="refs", ...)` | list references near the player |
 | `g.until(what, test, timeout, every)` | poll `test` until it is true, fail the run after `timeout` seconds |
 | `g.running()` | whether SkyrimSE.exe still runs |
+| `g.scene()` | the player's cell, worldspace and position |
 | `skse_log_since_save()` | the lines skse64.log got since the step's save |
 | `g.tool("input", ...)`, `g.tool("menu", ...)`, `g.tool("gfx", ...)` | press a key, open a menu, read or call into a menu's Flash movie |
 | `g.wait_hours(h)` | the wait menu, `h` hours |
@@ -44,5 +45,6 @@ The helpers they use:
 | [mkwav.py](mkwav.py), [uisound.py](uisound.py) | AudioFormat |
 | [ragfight.py](ragfight.py), [ragdoll_force.cpp](ragdoll_force.cpp), [counter_watch.cpp](counter_watch.cpp), [world_busy.cpp](world_busy.cpp) | RagdollWorldLock |
 | [LateHookRaceProbe.cpp](LateHookRaceProbe.cpp) | StartupHook |
+| [fasttravel.py](fasttravel.py), [path_follower_force.cpp](path_follower_force.cpp) | PathFollowerRace |
 
 The `.cpp` files are test plugins, or the part of one that matters.
