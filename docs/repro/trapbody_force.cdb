@@ -1,0 +1,17 @@
+$$ TrapBodyEntry: stand in for the reuse of a freed trap collision's memory (cdb attached to SkyrimSE.exe 1.6.1170).
+$$ Set these breakpoints before trapbody.py's steps. The first keeps the trap listener + 0x10 in $t1 (the function
+$$ that gives a trap a target, Address Library 25715, rcx = the listener). The other two print the collision that
+$$ leaves the world: a body (the listener's entity callback 26062) or a phantom (its phantom callback 26065), + 0x20.
+$$   bp SkyrimSE+3f0160 "r $t1 = @rcx+10; gc"
+$$   bp SkyrimSE+400ad0 ".printf \"gone %p\\n\", @rdx+20; gc"
+$$   bp SkyrimSE+400ba0 ".printf \"gone %p\\n\", @rdx+20; gc"
+$$ After the steps, break in, allocate a zeroed block (.dvalloc prints its address) and run the loop once per printed
+$$ trap collision, with that address over GONE and the block's over FAKE. An entry (listener + 0x8, next entry at
+$$ +0x10) that still points at a collision that left the world gets its collision (+0x18) pointed at the block: the
+$$ type byte at +0x28 is 0 and the motion pointer at +0x10 is 0, as in memory that something else uses now. Entries of
+$$ traps still in the world stay untouched.
+$$ Without the fix the next trap update reads motion + 0x30 and crashes at SkyrimSE+3FF101 with RAX = 0. With the fix
+$$ no such entry is left and nothing changes. Never do this in a game you play.
+.dvalloc 1000
+r $t2 = poi(@$t1-8); .while (@$t2 != 0) { .if (poi(@$t2+18) == GONE) { eq @$t2+18 FAKE; .printf "redirected entry %p\n", @$t2 }; r $t2 = poi(@$t2+10) }
+g

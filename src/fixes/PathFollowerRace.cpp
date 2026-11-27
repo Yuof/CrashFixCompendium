@@ -78,27 +78,6 @@ namespace PathFollowerRace
 			}
 			return false;
 		}
-
-		std::uintptr_t Slot(const REL::VariantID& a_vtable, std::size_t a_slot)
-		{
-			return reinterpret_cast<const std::uintptr_t*>(a_vtable.address())[a_slot];
-		}
-
-		bool InGame(std::uintptr_t a_at)
-		{
-			const auto base = REL::Module::get().base();
-			const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(
-				base + reinterpret_cast<const IMAGE_DOS_HEADER*>(base)->e_lfanew);
-			return a_at >= base && a_at < base + nt->OptionalHeader.SizeOfImage;
-		}
-
-		// The slot holds the function, or another plugin's hook of the slot (outside SkyrimSE.exe) that calls on into it.
-		// The fix hooks the function's entry, so a slot hook in front of it changes nothing for the fix.
-		bool SlotIs(const REL::VariantID& a_vtable, std::size_t a_slot, const REL::RelocationID& a_fn)
-		{
-			const auto at = Slot(a_vtable, a_slot);
-			return at == a_fn.address() || !InGame(at);
-		}
 	}
 
 	Result Install()

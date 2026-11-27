@@ -46,5 +46,6 @@ The helpers they use:
 | [ragfight.py](ragfight.py), [ragdoll_force.cpp](ragdoll_force.cpp), [counter_watch.cpp](counter_watch.cpp), [world_busy.cpp](world_busy.cpp) | RagdollWorldLock |
 | [LateHookRaceProbe.cpp](LateHookRaceProbe.cpp) | StartupHook |
 | [fasttravel.py](fasttravel.py), [path_follower_force.cpp](path_follower_force.cpp) | PathFollowerRace |
+| [trapbody.py](trapbody.py), [trapbody_force.cdb](trapbody_force.cdb) | TrapBodyEntry |
 
-The `.cpp` files are test plugins, or the part of one that matters.
+The `.cpp` files are test plugins, or the part of one that matters. The `.cdb` file is a script for the Windows debugger (cdb / WinDbg) attached to the game.

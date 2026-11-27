@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.0
+- New fix: Trap Body Entry (switch `TrapBodyEntry`, on by default). A crash at `SkyrimSE.exe+03FF101` (1.6.1170)
+  in the trap update, with `movups xmm0, [rax+0x30]` and RAX = 0. A trap was disabled or moved by a script while it
+  touched an actor. For a solid body (falling rocks) the game removes the trap's entry only when it still finds the
+  body's reference, and Disable clears that link first. For a phantom (spike beds) it never removes it. The fix
+  removes the entry when the trap's collision leaves the physics world.
+
 ## 1.7.0
 - New fix: Path Follower Race (switch `PathFollowerRace`, on by default). A crash at `SkyrimSE.exe+11BCBB0`
   (1.6.1170) during a fast travel, with `mov r8d, [rcx+0x80]` and RCX = 0. One thread cleared a far-away actor's

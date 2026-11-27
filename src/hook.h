@@ -37,6 +37,27 @@ std::string HookEntry(std::uintptr_t a_entry, std::string_view a_head, F a_detou
 	return JumpToDetour(a_entry, a_head.size(), reinterpret_cast<std::uintptr_t>(a_detour));
 }
 
+inline std::uintptr_t Slot(const REL::VariantID& a_vtable, std::size_t a_slot)
+{
+	return reinterpret_cast<const std::uintptr_t*>(a_vtable.address())[a_slot];
+}
+
+inline bool InGame(std::uintptr_t a_at)
+{
+	const auto base = REL::Module::get().base();
+	const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(
+		base + reinterpret_cast<const IMAGE_DOS_HEADER*>(base)->e_lfanew);
+	return a_at >= base && a_at < base + nt->OptionalHeader.SizeOfImage;
+}
+
+// The slot holds the function, or another plugin's hook of the slot (outside SkyrimSE.exe) that calls on into it.
+// A fix that hooks the function's entry, or chains behind the slot's current value, works with such a hook in front.
+inline bool SlotIs(const REL::VariantID& a_vtable, std::size_t a_slot, const REL::RelocationID& a_fn)
+{
+	const auto at = Slot(a_vtable, a_slot);
+	return at == a_fn.address() || !InGame(at);
+}
+
 constexpr std::size_t kReplaceSize = kAbsJumpSize;  // trampoline bytes for JumpToDetour
 
 constexpr std::size_t HookSize(std::string_view a_head)  // trampoline bytes for HookEntry
